@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <UseWPF>true</UseWPF>
+    <Description>Placeholder WPF host for the future accessible Audio Dock UI.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AudioDock.Core\AudioDock.Core.csproj" />
+    <ProjectReference Include="..\AudioDock.Windows\AudioDock.Windows.csproj" />
+  </ItemGroup>
+</Project>

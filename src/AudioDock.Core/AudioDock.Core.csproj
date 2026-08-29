@@ -1,0 +1,6 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Description>UI-independent scene, matching, planning, and result contracts for Audio Dock.</Description>
+  </PropertyGroup>
+</Project>
