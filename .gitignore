@@ -1,0 +1,35 @@
+# Build output
+bin/
+obj/
+artifacts/
+TestResults/
+coverage/
+
+# IDE and user state
+.vs/
+.idea/
+.vscode/*.user
+*.user
+*.suo
+
+# Packaging/signing
+*.msix
+*.msixbundle
+*.appx
+*.appxbundle
+*.pfx
+*.cer
+*.snk
+packages/
+
+# Runtime/local data
+*.log
+*.tmp
+*.db
+*.db-shm
+*.db-wal
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
