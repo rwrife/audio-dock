@@ -1,0 +1,50 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{E6EBB81F-8048-43D6-8B36-1C20D7142793}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AudioDock.Core", "src\AudioDock.Core\AudioDock.Core.csproj", "{FE6C25A9-9B9F-477A-9A6C-3FBEBEA1EB45}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AudioDock.Windows", "src\AudioDock.Windows\AudioDock.Windows.csproj", "{D23BE720-34EB-490B-A36A-1B316A3E3F28}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{BD445A25-F6BB-455B-AF04-8D1AACC5619F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AudioDock.Core.Tests", "tests\AudioDock.Core.Tests\AudioDock.Core.Tests.csproj", "{4F7BE266-F636-4891-9860-6F4D692FEAFF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AudioDock.App", "src\AudioDock.App\AudioDock.App.csproj", "{F5D7F5E6-484B-4EFB-A903-E2DB45E7A7DC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FE6C25A9-9B9F-477A-9A6C-3FBEBEA1EB45}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FE6C25A9-9B9F-477A-9A6C-3FBEBEA1EB45}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FE6C25A9-9B9F-477A-9A6C-3FBEBEA1EB45}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FE6C25A9-9B9F-477A-9A6C-3FBEBEA1EB45}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D23BE720-34EB-490B-A36A-1B316A3E3F28}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D23BE720-34EB-490B-A36A-1B316A3E3F28}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D23BE720-34EB-490B-A36A-1B316A3E3F28}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D23BE720-34EB-490B-A36A-1B316A3E3F28}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4F7BE266-F636-4891-9860-6F4D692FEAFF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4F7BE266-F636-4891-9860-6F4D692FEAFF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4F7BE266-F636-4891-9860-6F4D692FEAFF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4F7BE266-F636-4891-9860-6F4D692FEAFF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F5D7F5E6-484B-4EFB-A903-E2DB45E7A7DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F5D7F5E6-484B-4EFB-A903-E2DB45E7A7DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F5D7F5E6-484B-4EFB-A903-E2DB45E7A7DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F5D7F5E6-484B-4EFB-A903-E2DB45E7A7DC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{FE6C25A9-9B9F-477A-9A6C-3FBEBEA1EB45} = {E6EBB81F-8048-43D6-8B36-1C20D7142793}
+		{D23BE720-34EB-490B-A36A-1B316A3E3F28} = {E6EBB81F-8048-43D6-8B36-1C20D7142793}
+		{4F7BE266-F636-4891-9860-6F4D692FEAFF} = {BD445A25-F6BB-455B-AF04-8D1AACC5619F}
+		{F5D7F5E6-484B-4EFB-A903-E2DB45E7A7DC} = {E6EBB81F-8048-43D6-8B36-1C20D7142793}
+	EndGlobalSection
+EndGlobal

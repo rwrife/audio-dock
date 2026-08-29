@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Windows build and test
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5, Node 24
+        with:
+          dotnet-version: 8.0.x
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore locked dependencies
+        run: dotnet restore AudioDock.sln --locked-mode
+
+      - name: Verify formatting and analyzers
+        run: dotnet format AudioDock.sln --verify-no-changes --no-restore
+
+      - name: Build Release
+        run: dotnet build AudioDock.sln --configuration Release --no-restore
+
+      - name: Test Release
+        run: dotnet test AudioDock.sln --configuration Release --no-build --logger "console;verbosity=normal"
+
+      - name: Report vulnerable transitive packages
+        run: dotnet list AudioDock.sln package --vulnerable --include-transitive

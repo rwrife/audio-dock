@@ -2,7 +2,7 @@
 
 **Audio Dock is a local-first Windows tray utility for people who switch between speakers, headsets, docks, and calls to save, preview, and safely apply named audio-device and per-app volume scenes.**
 
-> **Status:** documentation and backlog scaffold only. There is no application, build, installer, or compatibility result yet.
+> **Status:** the .NET 8 foundation, UI-independent scene model, deterministic matching/planning, fake-adapter tests, and placeholder Windows/WPF project boundaries are implemented. Native Core Audio inventory, audio mutation, tray behavior, persistence, and packaging are not implemented yet.
 
 ## Motivation
 
@@ -68,17 +68,28 @@ All scene creation, preview, apply, undo, export, and settings actions must be k
 - **Persistence:** versioned JSON written atomically; no database needed for the MVP.
 - **Testing:** xUnit for matching/planning/persistence, fake native adapters for failure paths, and opt-in Windows integration tests on disposable scenes/devices.
 
+## Project layout
+
+- `src/AudioDock.Core` contains platform- and UI-independent scene, descriptor, capability, match, plan, apply-result, and rollback contracts.
+- `src/AudioDock.Windows` is an explicit placeholder for the future narrow Core Audio COM boundary. It does not invoke native audio APIs yet.
+- `src/AudioDock.App` is a WPF host placeholder. It does not inventory or mutate audio.
+- `tests/AudioDock.Core.Tests` exercises matching, planning, bounds, stale/ambiguous targets, and the fake inventory adapter without touching host audio state.
+
+The supported target remains **Windows 10 version 22H2 and Windows 11**. The current tests establish only managed domain and fake-adapter behavior; they are not evidence of Windows Core Audio, physical-device, driver, protected-session, installer, or universal application compatibility.
+
 ## Development quickstart
 
-The source tree is not implemented yet. The planned first milestone will create the solution and make these commands real:
+Install a .NET 8 SDK, then run from the repository root:
 
 ```powershell
-dotnet restore
-dotnet build --configuration Release
-dotnet test --configuration Release
+dotnet restore AudioDock.sln --locked-mode
+dotnet format AudioDock.sln --verify-no-changes --no-restore
+dotnet build AudioDock.sln --configuration Release --no-restore
+dotnet test AudioDock.sln --configuration Release --no-build
+dotnet list AudioDock.sln package --vulnerable --include-transitive
 ```
 
-Do not treat those commands as verified until the project skeleton issue lands and CI records real output.
+GitHub Actions runs these checks on `windows-latest`. A non-Windows developer can build and test the managed foundation with `EnableWindowsTargeting`; launching the WPF host and validating any future Core Audio behavior still require Windows. No command in this milestone opens, captures, stores, or analyzes audio samples.
 
 ## Milestones
 
