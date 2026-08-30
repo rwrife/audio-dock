@@ -16,11 +16,20 @@ internal sealed class FakeAudioInventory : IAudioInventory
 
     public int CaptureCount { get; private set; }
 
-    public ValueTask<AudioSnapshot> CaptureAsync(CancellationToken cancellationToken = default)
+    public ValueTask<AudioSnapshot> CaptureAsync(
+        AudioInventoryOptions? options = null,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         CaptureCount++;
         return ValueTask.FromResult(snapshot);
+    }
+
+    public async IAsyncEnumerable<AudioSnapshot> ObserveAsync(
+        AudioInventoryOptions? options = null,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        yield return await CaptureAsync(options, cancellationToken);
     }
 
     internal void SetSnapshot(AudioSnapshot value) => snapshot = value;

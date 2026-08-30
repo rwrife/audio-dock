@@ -10,7 +10,7 @@
       <TextBlock FontSize="28" FontWeight="SemiBold" Text="Audio Dock" />
       <TextBlock Margin="0,12,0,0"
                  TextWrapping="Wrap"
-                 Text="Foundation placeholder only. Native audio inventory and audio mutation are not implemented." />
+                 Text="Read-only inventory is available through AudioDock.Diagnostics. Scene editing and audio mutation are not implemented in this UI." />
     </StackPanel>
   </Grid>
 </Window>

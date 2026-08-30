@@ -29,7 +29,7 @@ public sealed class AudioInventoryContractTests
         cancellation.Cancel();
 
         await Assert.ThrowsAsync<OperationCanceledException>(async () =>
-            await inventory.CaptureAsync(cancellation.Token));
+            await inventory.CaptureAsync(cancellationToken: cancellation.Token));
         Assert.Equal(0, inventory.CaptureCount);
     }
 }

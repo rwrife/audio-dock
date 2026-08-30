@@ -32,7 +32,18 @@ public sealed record SessionDescriptor(
 public sealed record AudioSnapshot(
     DateTimeOffset CapturedAt,
     IReadOnlyList<EndpointDescriptor> Endpoints,
-    IReadOnlyList<SessionDescriptor> Sessions)
+    IReadOnlyList<SessionDescriptor> Sessions,
+    IReadOnlyList<InventoryDiagnostic>? Diagnostics = null)
 {
     public static AudioSnapshot Empty { get; } = new(DateTimeOffset.UnixEpoch, [], []);
 }
+
+public sealed record AudioInventoryOptions(
+    bool IncludeExecutablePaths = false,
+    TimeSpan? PollInterval = null);
+
+public sealed record InventoryDiagnostic(
+    string Scope,
+    string? StableId,
+    string Message,
+    int? NativeErrorCode = null);
