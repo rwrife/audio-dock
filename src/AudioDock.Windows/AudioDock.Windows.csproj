@@ -2,9 +2,12 @@
   <PropertyGroup>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <Description>Placeholder boundary for future Windows Core Audio interop.</Description>
+    <Description>Disposable, read-only Windows Core Audio inventory adapter.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\AudioDock.Core\AudioDock.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AudioDock.Windows.Tests" />
   </ItemGroup>
 </Project>
