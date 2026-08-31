@@ -4,7 +4,7 @@ using AudioDock.Core.Models;
 
 namespace AudioDock.Windows;
 
-public sealed class WindowsAudioInventory : IAudioInventory, IDisposable
+public sealed class WindowsAudioInventory : IAudioControlAdapter, IDisposable
 {
     private readonly IWindowsAudioInventoryBackend backend;
     private readonly CancellationTokenSource disposalCancellation = new();
@@ -20,11 +20,13 @@ public sealed class WindowsAudioInventory : IAudioInventory, IDisposable
         this.backend = backend ?? throw new ArgumentNullException(nameof(backend));
     }
 
-    public AdapterCapabilities Capabilities { get; } = new(
+    public AdapterCapabilities Capabilities => new(
         CanInventoryEndpoints: true,
         CanInventorySessions: true,
         CanObserveChanges: true,
-        Limitation: "Read-only snapshot polling; endpoint-role mutation is not implemented.");
+        Limitation: backend is IWindowsAudioControlBackend
+            ? "Writes are capability-probed and require observable read-back verification. Endpoint-role control uses a compatibility-sensitive Windows policy API."
+            : "This backend does not expose mutation.");
 
     public ValueTask<AudioSnapshot> CaptureAsync(
         AudioInventoryOptions? options = null,
@@ -99,6 +101,34 @@ public sealed class WindowsAudioInventory : IAudioInventory, IDisposable
         }
     }
 
+    public ValueTask<ControlWriteResult> WriteAsync(
+        AudioControlCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        ArgumentNullException.ThrowIfNull(command);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (backend is not IWindowsAudioControlBackend controlBackend)
+        {
+            return ValueTask.FromResult(ControlWriteResult.Failure(
+                "The selected Windows audio backend does not expose mutation."));
+        }
+
+        try
+        {
+            return ValueTask.FromResult(controlBackend.Write(command, cancellationToken));
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            return ValueTask.FromResult(ControlWriteResult.Failure(
+                $"The Windows audio control call failed: {exception.Message}", exception.HResult));
+        }
+    }
+
     public void Dispose()
     {
         if (disposed) return;
@@ -113,6 +143,11 @@ public sealed class WindowsAudioInventory : IAudioInventory, IDisposable
 public interface IWindowsAudioInventoryBackend : IDisposable
 {
     NativeInventorySnapshot Capture(bool includeExecutablePaths, CancellationToken cancellationToken);
+}
+
+public interface IWindowsAudioControlBackend : IWindowsAudioInventoryBackend
+{
+    ControlWriteResult Write(AudioControlCommand command, CancellationToken cancellationToken);
 }
 
 public sealed record NativeInventorySnapshot(

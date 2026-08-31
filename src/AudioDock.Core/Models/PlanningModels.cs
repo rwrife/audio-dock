@@ -8,7 +8,13 @@ public sealed record PlannedChange(
     string? ResolvedTargetId,
     string? Before,
     string? After,
-    string Explanation);
+    string Explanation,
+    EndpointMatchRule? EndpointMatch = null,
+    ApplicationMatchRule? ApplicationMatch = null,
+    AudioDirection? Direction = null,
+    AudioRole? Role = null,
+    VolumeLevel? Volume = null,
+    bool? IsMuted = null);
 
 public sealed record ScenePlan(Guid SceneId, IReadOnlyList<PlannedChange> Changes)
 {

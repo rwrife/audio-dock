@@ -25,8 +25,15 @@ public static class ScenePlanner
             string? targetId,
             string? before,
             string? after,
-            string explanation) =>
-            changes.Add(new(++sequence, kind, disposition, target, targetId, before, after, explanation));
+            string explanation,
+            EndpointMatchRule? endpointMatch = null,
+            ApplicationMatchRule? applicationMatch = null,
+            AudioDirection? direction = null,
+            AudioRole? role = null,
+            VolumeLevel? volume = null,
+            bool? isMuted = null) =>
+            changes.Add(new(++sequence, kind, disposition, target, targetId, before, after, explanation,
+                endpointMatch, applicationMatch, direction, role, volume, isMuted));
 
         foreach (RoleTarget target in scene.RoleTargets.OrderBy(item => item.Endpoint.Direction).ThenBy(item => item.Role))
         {
@@ -34,7 +41,8 @@ public static class ScenePlanner
             string label = $"{target.Endpoint.Direction} {target.Role} role";
             if (match.Status != MatchStatus.Matched)
             {
-                Add(ChangeKind.DefaultRole, PlanDisposition.Skipped, label, null, null, null, Explain(match.Status, "endpoint"));
+                Add(ChangeKind.DefaultRole, PlanDisposition.Skipped, label, null, null, null, Explain(match.Status, "endpoint"),
+                    endpointMatch: target.Endpoint, direction: target.Endpoint.Direction, role: target.Role);
                 continue;
             }
 
@@ -44,15 +52,18 @@ public static class ScenePlanner
 
             if (endpoint.DefaultRoles.Contains(target.Role))
             {
-                Add(ChangeKind.DefaultRole, PlanDisposition.NoOp, label, endpoint.StableId, endpoint.StableId, endpoint.StableId, "The endpoint already owns this role.");
+                Add(ChangeKind.DefaultRole, PlanDisposition.NoOp, label, endpoint.StableId, endpoint.StableId, endpoint.StableId, "The endpoint already owns this role.",
+                    endpointMatch: target.Endpoint, direction: target.Endpoint.Direction, role: target.Role);
             }
             else if (!endpoint.Capabilities.CanSetDefaultRole)
             {
-                Add(ChangeKind.DefaultRole, PlanDisposition.Skipped, label, endpoint.StableId, current?.StableId, endpoint.StableId, "The adapter did not report role-selection capability for this endpoint.");
+                Add(ChangeKind.DefaultRole, PlanDisposition.Skipped, label, endpoint.StableId, current?.StableId, endpoint.StableId, "The adapter did not report role-selection capability for this endpoint.",
+                    endpointMatch: target.Endpoint, direction: target.Endpoint.Direction, role: target.Role);
             }
             else
             {
-                Add(ChangeKind.DefaultRole, PlanDisposition.Apply, label, endpoint.StableId, current?.StableId ?? "none", endpoint.StableId, "Set the role only after a later executor re-resolves the endpoint.");
+                Add(ChangeKind.DefaultRole, PlanDisposition.Apply, label, endpoint.StableId, current?.StableId ?? "none", endpoint.StableId, "Set the role only after a later executor re-resolves the endpoint.",
+                    endpointMatch: target.Endpoint, direction: target.Endpoint.Direction, role: target.Role);
             }
         }
 
@@ -65,12 +76,14 @@ public static class ScenePlanner
                 string reason = Explain(match.Status, "endpoint");
                 if (rule.Volume is not null)
                 {
-                    Add(ChangeKind.EndpointVolume, PlanDisposition.Skipped, label, null, null, rule.Volume.ToString(), reason);
+                    Add(ChangeKind.EndpointVolume, PlanDisposition.Skipped, label, null, null, rule.Volume.ToString(), reason,
+                        endpointMatch: rule.Match, volume: rule.Volume);
                 }
 
                 if (rule.IsMuted is not null)
                 {
-                    Add(ChangeKind.EndpointMute, PlanDisposition.Skipped, label, null, null, Format(rule.IsMuted.Value), reason);
+                    Add(ChangeKind.EndpointMute, PlanDisposition.Skipped, label, null, null, Format(rule.IsMuted.Value), reason,
+                        endpointMatch: rule.Match, isMuted: rule.IsMuted);
                 }
 
                 continue;
@@ -81,15 +94,18 @@ public static class ScenePlanner
             {
                 if (!endpoint.Capabilities.CanSetVolume)
                 {
-                    Add(ChangeKind.EndpointVolume, PlanDisposition.Skipped, label, endpoint.StableId, endpoint.Volume?.ToString(), desiredVolume.ToString(), "Endpoint volume control is unavailable.");
+                    Add(ChangeKind.EndpointVolume, PlanDisposition.Skipped, label, endpoint.StableId, endpoint.Volume?.ToString(), desiredVolume.ToString(), "Endpoint volume control is unavailable.",
+                        endpointMatch: rule.Match, volume: desiredVolume);
                 }
                 else if (endpoint.Volume == desiredVolume)
                 {
-                    Add(ChangeKind.EndpointVolume, PlanDisposition.NoOp, label, endpoint.StableId, desiredVolume.ToString(), desiredVolume.ToString(), "Endpoint volume already matches.");
+                    Add(ChangeKind.EndpointVolume, PlanDisposition.NoOp, label, endpoint.StableId, desiredVolume.ToString(), desiredVolume.ToString(), "Endpoint volume already matches.",
+                        endpointMatch: rule.Match, volume: desiredVolume);
                 }
                 else
                 {
-                    Add(ChangeKind.EndpointVolume, PlanDisposition.Apply, label, endpoint.StableId, endpoint.Volume?.ToString() ?? "unknown", desiredVolume.ToString(), "Set bounded endpoint volume after re-resolution.");
+                    Add(ChangeKind.EndpointVolume, PlanDisposition.Apply, label, endpoint.StableId, endpoint.Volume?.ToString() ?? "unknown", desiredVolume.ToString(), "Set bounded endpoint volume after re-resolution.",
+                        endpointMatch: rule.Match, volume: desiredVolume);
                 }
             }
 
@@ -97,15 +113,18 @@ public static class ScenePlanner
             {
                 if (!endpoint.Capabilities.CanSetMute)
                 {
-                    Add(ChangeKind.EndpointMute, PlanDisposition.Skipped, label, endpoint.StableId, Format(endpoint.IsMuted), Format(desiredMute), "Endpoint mute control is unavailable.");
+                    Add(ChangeKind.EndpointMute, PlanDisposition.Skipped, label, endpoint.StableId, Format(endpoint.IsMuted), Format(desiredMute), "Endpoint mute control is unavailable.",
+                        endpointMatch: rule.Match, isMuted: desiredMute);
                 }
                 else if (endpoint.IsMuted == desiredMute)
                 {
-                    Add(ChangeKind.EndpointMute, PlanDisposition.NoOp, label, endpoint.StableId, Format(desiredMute), Format(desiredMute), "Endpoint mute already matches.");
+                    Add(ChangeKind.EndpointMute, PlanDisposition.NoOp, label, endpoint.StableId, Format(desiredMute), Format(desiredMute), "Endpoint mute already matches.",
+                        endpointMatch: rule.Match, isMuted: desiredMute);
                 }
                 else
                 {
-                    Add(ChangeKind.EndpointMute, PlanDisposition.Apply, label, endpoint.StableId, Format(endpoint.IsMuted), Format(desiredMute), "Set endpoint mute after re-resolution.");
+                    Add(ChangeKind.EndpointMute, PlanDisposition.Apply, label, endpoint.StableId, Format(endpoint.IsMuted), Format(desiredMute), "Set endpoint mute after re-resolution.",
+                        endpointMatch: rule.Match, isMuted: desiredMute);
                 }
             }
         }
@@ -121,12 +140,14 @@ public static class ScenePlanner
                     : Explain(match.Status, "application session");
                 if (rule.Volume is not null)
                 {
-                    Add(ChangeKind.SessionVolume, PlanDisposition.Skipped, label, null, null, rule.Volume.ToString(), reason);
+                    Add(ChangeKind.SessionVolume, PlanDisposition.Skipped, label, null, null, rule.Volume.ToString(), reason,
+                        applicationMatch: rule.Match, volume: rule.Volume);
                 }
 
                 if (rule.IsMuted is not null)
                 {
-                    Add(ChangeKind.SessionMute, PlanDisposition.Skipped, label, null, null, Format(rule.IsMuted.Value), reason);
+                    Add(ChangeKind.SessionMute, PlanDisposition.Skipped, label, null, null, Format(rule.IsMuted.Value), reason,
+                        applicationMatch: rule.Match, isMuted: rule.IsMuted);
                 }
 
                 continue;
@@ -137,15 +158,18 @@ public static class ScenePlanner
             {
                 if (!session.Capabilities.CanSetVolume)
                 {
-                    Add(ChangeKind.SessionVolume, PlanDisposition.Skipped, label, session.SessionId, session.Volume?.ToString(), desiredVolume.ToString(), "Session volume control is unavailable.");
+                    Add(ChangeKind.SessionVolume, PlanDisposition.Skipped, label, session.SessionId, session.Volume?.ToString(), desiredVolume.ToString(), "Session volume control is unavailable.",
+                        applicationMatch: rule.Match, volume: desiredVolume);
                 }
                 else if (session.Volume == desiredVolume)
                 {
-                    Add(ChangeKind.SessionVolume, PlanDisposition.NoOp, label, session.SessionId, desiredVolume.ToString(), desiredVolume.ToString(), "Session volume already matches.");
+                    Add(ChangeKind.SessionVolume, PlanDisposition.NoOp, label, session.SessionId, desiredVolume.ToString(), desiredVolume.ToString(), "Session volume already matches.",
+                        applicationMatch: rule.Match, volume: desiredVolume);
                 }
                 else
                 {
-                    Add(ChangeKind.SessionVolume, PlanDisposition.Apply, label, session.SessionId, session.Volume?.ToString() ?? "unknown", desiredVolume.ToString(), "Set bounded session volume after re-resolution.");
+                    Add(ChangeKind.SessionVolume, PlanDisposition.Apply, label, session.SessionId, session.Volume?.ToString() ?? "unknown", desiredVolume.ToString(), "Set bounded session volume after re-resolution.",
+                        applicationMatch: rule.Match, volume: desiredVolume);
                 }
             }
 
@@ -153,15 +177,18 @@ public static class ScenePlanner
             {
                 if (!session.Capabilities.CanSetMute)
                 {
-                    Add(ChangeKind.SessionMute, PlanDisposition.Skipped, label, session.SessionId, Format(session.IsMuted), Format(desiredMute), "Session mute control is unavailable.");
+                    Add(ChangeKind.SessionMute, PlanDisposition.Skipped, label, session.SessionId, Format(session.IsMuted), Format(desiredMute), "Session mute control is unavailable.",
+                        applicationMatch: rule.Match, isMuted: desiredMute);
                 }
                 else if (session.IsMuted == desiredMute)
                 {
-                    Add(ChangeKind.SessionMute, PlanDisposition.NoOp, label, session.SessionId, Format(desiredMute), Format(desiredMute), "Session mute already matches.");
+                    Add(ChangeKind.SessionMute, PlanDisposition.NoOp, label, session.SessionId, Format(desiredMute), Format(desiredMute), "Session mute already matches.",
+                        applicationMatch: rule.Match, isMuted: desiredMute);
                 }
                 else
                 {
-                    Add(ChangeKind.SessionMute, PlanDisposition.Apply, label, session.SessionId, Format(session.IsMuted), Format(desiredMute), "Set session mute after re-resolution.");
+                    Add(ChangeKind.SessionMute, PlanDisposition.Apply, label, session.SessionId, Format(session.IsMuted), Format(desiredMute), "Set session mute after re-resolution.",
+                        applicationMatch: rule.Match, isMuted: desiredMute);
                 }
             }
         }

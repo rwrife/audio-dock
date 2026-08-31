@@ -128,6 +128,41 @@ public sealed class WindowsAudioInventoryTests
         Assert.True(backend.Disposed);
     }
 
+    [Fact]
+    public async Task WriteReportsUnavailableCapabilityInsteadOfClaimingMutation()
+    {
+        using var backend = new FakeBackend();
+        using var adapter = new WindowsAudioInventory(backend);
+
+        ControlWriteResult result = await adapter.WriteAsync(
+            new(ChangeKind.EndpointMute, "speakers", IsMuted: true));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("does not expose mutation", result.Detail, StringComparison.Ordinal);
+        Assert.Equal(0, backend.CaptureCount);
+    }
+
+    [Fact]
+    public async Task WriteDelegatesTypedCommandAndPreservesNativeFailure()
+    {
+        using var backend = new FakeControlBackend
+        {
+            Result = ControlWriteResult.Failure("Access denied.", 5),
+        };
+        using var adapter = new WindowsAudioInventory(backend);
+        var command = new AudioControlCommand(
+            ChangeKind.SessionVolume,
+            "endpoint|session",
+            Volume: new VolumeLevel(0.4));
+
+        ControlWriteResult result = await adapter.WriteAsync(command);
+
+        Assert.Same(command, backend.Command);
+        Assert.False(result.Succeeded);
+        Assert.Equal(5, result.NativeErrorCode);
+        Assert.Contains("capability-probed", adapter.Capabilities.Limitation, StringComparison.Ordinal);
+    }
+
     private static EndpointDescriptor Endpoint(string id, string name, EndpointState state) =>
         new(id, name, AudioDirection.Render, state, [], EndpointCapabilities.ReadOnly);
 
@@ -152,5 +187,25 @@ public sealed class WindowsAudioInventoryTests
         }
 
         public void Dispose() => Disposed = true;
+    }
+
+    private sealed class FakeControlBackend : IWindowsAudioControlBackend
+    {
+        public required ControlWriteResult Result { get; init; }
+
+        public AudioControlCommand? Command { get; private set; }
+
+        public NativeInventorySnapshot Capture(bool includeExecutablePaths, CancellationToken cancellationToken) =>
+            new([], [], []);
+
+        public ControlWriteResult Write(AudioControlCommand command, CancellationToken cancellationToken)
+        {
+            Command = command;
+            return Result;
+        }
+
+        public void Dispose()
+        {
+        }
     }
 }
