@@ -2,7 +2,7 @@
 
 **Audio Dock is a local-first Windows tray utility for people who switch between speakers, headsets, docks, and calls to save, preview, and safely apply named audio-device and per-app volume scenes.**
 
-> **Status:** the .NET 8 foundation, UI-independent scene model, deterministic matching/planning, read-only Core Audio inventory adapter, component tests, and opt-in diagnostic console are implemented. Audio mutation, tray behavior, persistence, packaging, and physical-Windows compatibility validation are not implemented yet.
+> **Status:** the .NET 8 foundation, UI-independent scene model, deterministic matching/planning, transactional execution/undo, capability-probed Core Audio inventory and controls, component tests, and opt-in diagnostics are implemented. Tray behavior, persistence, packaging, and physical-Windows compatibility validation are not complete yet.
 
 ## Motivation
 
@@ -70,14 +70,14 @@ All scene creation, preview, apply, undo, export, and settings actions must be k
 
 ## Project layout
 
-- `src/AudioDock.Core` contains platform- and UI-independent scene, descriptor, capability, match, plan, apply-result, and rollback contracts.
-- `src/AudioDock.Windows` contains the narrow, disposable, read-only Core Audio COM boundary. Managed descriptors and diagnostics are the only values crossing into Core/UI.
+- `src/AudioDock.Core` contains platform- and UI-independent scene, descriptor, capability, match, plan, transactional execution, apply-result, and bounded undo contracts.
+- `src/AudioDock.Windows` contains the narrow, disposable Core Audio COM boundary. It inventories metadata and performs only capability-probed role, volume, and mute writes; managed descriptors, commands, results, and diagnostics are the only values crossing into Core/UI.
 - `src/AudioDock.Diagnostics` is an opt-in, stdout-only inventory command; executable paths require an explicit flag.
 - `src/AudioDock.App` is a WPF host placeholder. It does not inventory or mutate audio.
-- `tests/AudioDock.Core.Tests` exercises matching, planning, bounds, stale/ambiguous targets, and the fake inventory adapter without touching host audio state.
-- `tests/AudioDock.Windows.Tests` exercises the Windows adapter through a fake native backend, including simulated partial failures, disappearing sessions, privacy, native-enum mapping, and teardown.
+- `tests/AudioDock.Core.Tests` exercises matching, planning, bounds, stale/ambiguous targets, transactional writes, verification, cancellation, rollback/undo, and fake-adapter failures without touching host audio state.
+- `tests/AudioDock.Windows.Tests` exercises the Windows adapter through fake native backends and includes a separately gated mutation test that restores the selected host endpoint in `finally`.
 
-The supported target remains **Windows 10 version 22H2 and Windows 11**. See [the compatibility and evidence note](docs/compatibility.md). Current automated results establish compilation and managed fake/component behavior; they are not evidence of physical-device, driver, protected-session, installer, or universal application compatibility.
+The supported target remains **Windows 10 version 22H2 and Windows 11**. See [the inventory compatibility note](docs/compatibility.md) and [transactional apply evidence](docs/transactional-apply.md). Current automated results establish compilation and managed fake/component behavior; they are not evidence of physical-device, driver, protected-session, installer, or universal application compatibility.
 
 ## Development quickstart
 
@@ -91,9 +91,9 @@ dotnet test AudioDock.sln --configuration Release --no-build
 dotnet list AudioDock.sln package --vulnerable --include-transitive
 ```
 
-On a supported Windows machine, opt in to one read-only JSON snapshot with `dotnet run --project src/AudioDock.Diagnostics --configuration Release`. Add `--watch` for polling or `--include-executable-paths` to explicitly include otherwise-redacted paths. No inventory command can mutate audio state.
+On a supported Windows machine, opt in to one read-only JSON snapshot with `dotnet run --project src/AudioDock.Diagnostics --configuration Release`. Add `--watch` for polling or `--include-executable-paths` to explicitly include otherwise-redacted paths. No inventory command can mutate audio state. The separately gated mutation integration test and its required restoration procedure are documented in [docs/transactional-apply.md](docs/transactional-apply.md).
 
-GitHub Actions runs these checks on `windows-latest`. A non-Windows developer can build and test the managed foundation with `EnableWindowsTargeting`; launching the WPF host and validating any future Core Audio behavior still require Windows. No command in this milestone opens, captures, stores, or analyzes audio samples.
+GitHub Actions runs these checks on `windows-latest`. A non-Windows developer can build and test the managed foundation with `EnableWindowsTargeting`; launching the WPF host and validating real Core Audio behavior still require Windows. No command in this milestone opens, captures, stores, or analyzes audio samples.
 
 ## Milestones
 

@@ -20,6 +20,14 @@ internal static class NativeAudioMapping
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Unknown Core Audio role."),
     };
 
+    internal static ERole MapRole(AudioDock.Core.Models.AudioRole role) => role switch
+    {
+        AudioDock.Core.Models.AudioRole.Console => ERole.Console,
+        AudioDock.Core.Models.AudioRole.Multimedia => ERole.Multimedia,
+        AudioDock.Core.Models.AudioRole.Communications => ERole.Communications,
+        _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Unknown Audio Dock role."),
+    };
+
     internal static AudioDock.Core.Models.SessionState MapSessionState(AudioSessionState state) => state switch
     {
         AudioSessionState.Active => AudioDock.Core.Models.SessionState.Active,
@@ -84,6 +92,26 @@ internal struct PropVariant
 
 [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
 internal sealed class MMDeviceEnumeratorComObject { }
+
+[ComImport, Guid("294935CE-F637-4E7C-A41B-AB255460B862")]
+internal sealed class PolicyConfigClientComObject { }
+
+[ComImport, InterfaceType(ComInterfaceType.InterfaceIsIUnknown), Guid("568B9108-44BF-40B4-9006-86AFE5B5A620")]
+internal interface IPolicyConfigVista
+{
+    [PreserveSig] int GetMixFormat([MarshalAs(UnmanagedType.LPWStr)] string deviceId, out IntPtr format);
+    [PreserveSig] int GetDeviceFormat([MarshalAs(UnmanagedType.LPWStr)] string deviceId, int defaultFormat, out IntPtr format);
+    [PreserveSig] int ResetDeviceFormat([MarshalAs(UnmanagedType.LPWStr)] string deviceId);
+    [PreserveSig] int SetDeviceFormat([MarshalAs(UnmanagedType.LPWStr)] string deviceId, IntPtr endpointFormat, IntPtr mixFormat);
+    [PreserveSig] int GetProcessingPeriod([MarshalAs(UnmanagedType.LPWStr)] string deviceId, int defaultPeriod, out long period, out long minimumPeriod);
+    [PreserveSig] int SetProcessingPeriod([MarshalAs(UnmanagedType.LPWStr)] string deviceId, ref long period);
+    [PreserveSig] int GetShareMode([MarshalAs(UnmanagedType.LPWStr)] string deviceId, IntPtr mode);
+    [PreserveSig] int SetShareMode([MarshalAs(UnmanagedType.LPWStr)] string deviceId, IntPtr mode);
+    [PreserveSig] int GetPropertyValue([MarshalAs(UnmanagedType.LPWStr)] string deviceId, ref PropertyKey key, out PropVariant value);
+    [PreserveSig] int SetPropertyValue([MarshalAs(UnmanagedType.LPWStr)] string deviceId, ref PropertyKey key, ref PropVariant value);
+    [PreserveSig] int SetDefaultEndpoint([MarshalAs(UnmanagedType.LPWStr)] string deviceId, ERole role);
+    [PreserveSig] int SetEndpointVisibility([MarshalAs(UnmanagedType.LPWStr)] string deviceId, int visible);
+}
 
 [ComImport, InterfaceType(ComInterfaceType.InterfaceIsIUnknown), Guid("A95664D2-9614-4F35-A746-DE8DB63617E6")]
 internal interface IMMDeviceEnumerator

@@ -7,7 +7,7 @@ using AudioDock.Windows.Interop;
 
 namespace AudioDock.Windows;
 
-internal sealed class CoreAudioInventoryBackend : IWindowsAudioInventoryBackend
+internal sealed class CoreAudioInventoryBackend : IWindowsAudioControlBackend
 {
     private bool disposed;
 
@@ -25,12 +25,13 @@ internal sealed class CoreAudioInventoryBackend : IWindowsAudioInventoryBackend
             enumerator = (IMMDeviceEnumerator)(object)new MMDeviceEnumeratorComObject();
             var diagnostics = new List<InventoryDiagnostic>();
             Dictionary<(AudioDirection, AudioRole), string> defaults = ReadDefaults(enumerator, diagnostics);
+            bool canSetDefaultRole = PolicyConfiguration.IsAvailable();
             List<EndpointDescriptor> endpoints = [];
             List<SessionDescriptor> sessions = [];
-            EnumerateDirection(enumerator, EDataFlow.Render, AudioDirection.Render, defaults, includeExecutablePaths,
-                endpoints, sessions, diagnostics, cancellationToken);
-            EnumerateDirection(enumerator, EDataFlow.Capture, AudioDirection.Capture, defaults, includeExecutablePaths,
-                endpoints, sessions, diagnostics, cancellationToken);
+            EnumerateDirection(enumerator, EDataFlow.Render, AudioDirection.Render, defaults, canSetDefaultRole,
+                includeExecutablePaths, endpoints, sessions, diagnostics, cancellationToken);
+            EnumerateDirection(enumerator, EDataFlow.Capture, AudioDirection.Capture, defaults, canSetDefaultRole,
+                includeExecutablePaths, endpoints, sessions, diagnostics, cancellationToken);
             return new(endpoints, sessions, diagnostics);
         }
         finally
@@ -40,6 +41,38 @@ internal sealed class CoreAudioInventoryBackend : IWindowsAudioInventoryBackend
     }
 
     public void Dispose() => disposed = true;
+
+    public ControlWriteResult Write(AudioControlCommand command, CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!OperatingSystem.IsWindows())
+        {
+            return ControlWriteResult.Failure("Core Audio mutation requires Windows 10 22H2 or Windows 11.");
+        }
+
+        try
+        {
+            return command.Kind switch
+            {
+                ChangeKind.DefaultRole when command.Role is not null =>
+                    PolicyConfiguration.SetDefault(command.TargetId, command.Role.Value),
+                ChangeKind.EndpointVolume when command.Volume is not null =>
+                    WriteEndpoint(command.TargetId, command.Volume.Value, null),
+                ChangeKind.EndpointMute when command.IsMuted is not null =>
+                    WriteEndpoint(command.TargetId, null, command.IsMuted.Value),
+                ChangeKind.SessionVolume when command.Volume is not null =>
+                    WriteSession(command.TargetId, command.Volume.Value, null, cancellationToken),
+                ChangeKind.SessionMute when command.IsMuted is not null =>
+                    WriteSession(command.TargetId, null, command.IsMuted.Value, cancellationToken),
+                _ => ControlWriteResult.Failure("The control command is missing its required typed value."),
+            };
+        }
+        catch (COMException exception)
+        {
+            return ControlWriteResult.Failure(exception.Message, exception.HResult);
+        }
+    }
 
     private static Dictionary<(AudioDirection, AudioRole), string> ReadDefaults(
         IMMDeviceEnumerator enumerator,
@@ -79,6 +112,7 @@ internal sealed class CoreAudioInventoryBackend : IWindowsAudioInventoryBackend
         EDataFlow flow,
         AudioDirection direction,
         Dictionary<(AudioDirection, AudioRole), string> defaults,
+        bool canSetDefaultRole,
         bool includeExecutablePaths,
         List<EndpointDescriptor> endpoints,
         List<SessionDescriptor> sessions,
@@ -107,7 +141,8 @@ internal sealed class CoreAudioInventoryBackend : IWindowsAudioInventoryBackend
                         .ToArray();
                     (VolumeLevel? volume, bool? muted) = ReadEndpointVolume(device, stableId, diagnostics);
                     endpoints.Add(new(stableId, name, direction, Map(state), roles,
-                        EndpointCapabilities.ReadOnly, volume, muted));
+                        new(canSetDefaultRole && state == DeviceState.Active, volume is not null, muted is not null),
+                        volume, muted));
                     if (state == DeviceState.Active)
                     {
                         ReadSessions(device, stableId, includeExecutablePaths, sessions, diagnostics, cancellationToken);
@@ -209,7 +244,7 @@ internal sealed class CoreAudioInventoryBackend : IWindowsAudioInventoryBackend
                     Marshal.ThrowExceptionForHR(simpleVolume.GetMute(out bool muted));
                     string stableSessionId = NativeAudioMapping.ComposeSessionId(endpointId, identifier);
                     sessions.Add(new(stableSessionId, identity.Name, NativeAudioMapping.MapSessionState(state),
-                        SessionCapabilities.ReadOnly, new VolumeLevel(scalar), muted,
+                        new(true, true), new VolumeLevel(scalar), muted,
                         identity.PackageFamilyName, ExecutablePath: identity.ExecutablePath,
                         ProcessId: checked((int)processId)));
                     if (identity.Diagnostic is not null)
@@ -241,6 +276,134 @@ internal sealed class CoreAudioInventoryBackend : IWindowsAudioInventoryBackend
         }
     }
 
+    private static ControlWriteResult WriteEndpoint(string endpointId, VolumeLevel? volume, bool? muted)
+    {
+        IMMDeviceEnumerator? enumerator = null;
+        IMMDevice? device = null;
+        object? activated = null;
+        try
+        {
+            enumerator = (IMMDeviceEnumerator)(object)new MMDeviceEnumeratorComObject();
+            Marshal.ThrowExceptionForHR(enumerator.GetDevice(endpointId, out device));
+            Marshal.ThrowExceptionForHR(device.GetState(out DeviceState state));
+            if (state != DeviceState.Active)
+            {
+                return ControlWriteResult.Failure($"Endpoint '{endpointId}' is not active.");
+            }
+
+            Guid iid = typeof(IAudioEndpointVolume).GUID;
+            Marshal.ThrowExceptionForHR(device.Activate(ref iid, ClsCtx.All, IntPtr.Zero, out activated));
+            var endpointVolume = (IAudioEndpointVolume)activated;
+            int hr = volume is not null
+                ? endpointVolume.SetMasterVolumeLevelScalar((float)volume.Value.Value, IntPtr.Zero)
+                : endpointVolume.SetMute(muted!.Value, IntPtr.Zero);
+            Marshal.ThrowExceptionForHR(hr);
+            return ControlWriteResult.Success();
+        }
+        finally
+        {
+            ComRelease.Final(activated);
+            ComRelease.Final(device);
+            ComRelease.Final(enumerator);
+        }
+    }
+
+    private static ControlWriteResult WriteSession(
+        string sessionId,
+        VolumeLevel? volume,
+        bool? muted,
+        CancellationToken cancellationToken)
+    {
+        IMMDeviceEnumerator? enumerator = null;
+        try
+        {
+            enumerator = (IMMDeviceEnumerator)(object)new MMDeviceEnumeratorComObject();
+            foreach (EDataFlow flow in new[] { EDataFlow.Render, EDataFlow.Capture })
+            {
+                ControlWriteResult? result = TryWriteSession(
+                    enumerator, flow, sessionId, volume, muted, cancellationToken);
+                if (result is not null) return result;
+            }
+
+            return ControlWriteResult.Failure("The audio session disappeared before the control write.");
+        }
+        finally
+        {
+            ComRelease.Final(enumerator);
+        }
+    }
+
+    private static ControlWriteResult? TryWriteSession(
+        IMMDeviceEnumerator enumerator,
+        EDataFlow flow,
+        string wantedSessionId,
+        VolumeLevel? volume,
+        bool? muted,
+        CancellationToken cancellationToken)
+    {
+        IMMDeviceCollection? devices = null;
+        try
+        {
+            Marshal.ThrowExceptionForHR(enumerator.EnumAudioEndpoints(flow, DeviceState.Active, out devices));
+            Marshal.ThrowExceptionForHR(devices.GetCount(out uint deviceCount));
+            for (uint deviceIndex = 0; deviceIndex < deviceCount; deviceIndex++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                IMMDevice? device = null;
+                object? activated = null;
+                IAudioSessionEnumerator? sessions = null;
+                try
+                {
+                    Marshal.ThrowExceptionForHR(devices.Item(deviceIndex, out device));
+                    Marshal.ThrowExceptionForHR(device.GetId(out string endpointId));
+                    Guid iid = typeof(IAudioSessionManager2).GUID;
+                    Marshal.ThrowExceptionForHR(device.Activate(ref iid, ClsCtx.All, IntPtr.Zero, out activated));
+                    var manager = (IAudioSessionManager2)activated;
+                    Marshal.ThrowExceptionForHR(manager.GetSessionEnumerator(out sessions));
+                    Marshal.ThrowExceptionForHR(sessions.GetCount(out int sessionCount));
+                    for (int sessionIndex = 0; sessionIndex < sessionCount; sessionIndex++)
+                    {
+                        IAudioSessionControl? control = null;
+                        try
+                        {
+                            Marshal.ThrowExceptionForHR(sessions.GetSession(sessionIndex, out control));
+                            var control2 = (IAudioSessionControl2)control;
+                            Marshal.ThrowExceptionForHR(control2.GetSessionInstanceIdentifier(out string instanceId));
+                            if (!StringComparer.Ordinal.Equals(
+                                NativeAudioMapping.ComposeSessionId(endpointId, instanceId), wantedSessionId))
+                            {
+                                continue;
+                            }
+
+                            var simpleVolume = (ISimpleAudioVolume)control;
+                            int hr = volume is not null
+                                ? simpleVolume.SetMasterVolume((float)volume.Value.Value, IntPtr.Zero)
+                                : simpleVolume.SetMute(muted!.Value, IntPtr.Zero);
+                            Marshal.ThrowExceptionForHR(hr);
+                            return ControlWriteResult.Success();
+                        }
+                        finally
+                        {
+                            ComRelease.Final(control);
+                        }
+                    }
+                }
+                finally
+                {
+                    ComRelease.Final(sessions);
+                    ComRelease.Final(activated);
+                    ComRelease.Final(device);
+                }
+            }
+
+            return null;
+        }
+        finally
+        {
+            ComRelease.Final(devices);
+        }
+    }
+
     private static EndpointState Map(DeviceState state) => state switch
     {
         DeviceState.Active => EndpointState.Active,
@@ -249,6 +412,48 @@ internal sealed class CoreAudioInventoryBackend : IWindowsAudioInventoryBackend
         DeviceState.Unplugged => EndpointState.Unplugged,
         _ => EndpointState.NotPresent,
     };
+}
+
+internal static class PolicyConfiguration
+{
+    internal static bool IsAvailable()
+    {
+        object? policy = null;
+        try
+        {
+            policy = new PolicyConfigClientComObject();
+            return policy is IPolicyConfigVista;
+        }
+        catch (COMException)
+        {
+            return false;
+        }
+        finally
+        {
+            ComRelease.Final(policy);
+        }
+    }
+
+    internal static ControlWriteResult SetDefault(string endpointId, AudioRole role)
+    {
+        object? policy = null;
+        try
+        {
+            policy = new PolicyConfigClientComObject();
+            if (policy is not IPolicyConfigVista config)
+            {
+                return ControlWriteResult.Failure(
+                    "This Windows build does not expose the probed endpoint-role capability.");
+            }
+
+            Marshal.ThrowExceptionForHR(config.SetDefaultEndpoint(endpointId, NativeAudioMapping.MapRole(role)));
+            return ControlWriteResult.Success();
+        }
+        finally
+        {
+            ComRelease.Final(policy);
+        }
+    }
 }
 
 internal sealed record ProcessIdentity(
