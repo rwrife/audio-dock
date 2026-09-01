@@ -33,6 +33,45 @@ public sealed class SceneExecutorTests
     }
 
     [Fact]
+    public async Task StateChangedAfterInitialValidationIsNotOverwritten()
+    {
+        EndpointDescriptor endpoint = TestData.Endpoint("speakers", volume: new VolumeLevel(0.2));
+        var adapter = new FakeControlAdapter([endpoint], [])
+        {
+            MutateOnCapture = (2, ChangeKind.EndpointVolume, "speakers", 0.4, null),
+        };
+        AudioScene scene = Scene(endpoints: [new(new(AudioDirection.Render, ExactId: "speakers"), new VolumeLevel(0.7))]);
+
+        ApplyResult result = await new SceneExecutor(adapter).ApplyAsync(scene);
+
+        Assert.Equal(ApplyOverallState.Failed, result.State);
+        Assert.Contains("Re-preview", Assert.Single(result.Operations).Detail, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(adapter.Events, item => item.StartsWith("write", StringComparison.Ordinal));
+        Assert.Equal(new VolumeLevel(0.4), (await adapter.CaptureAsync()).Endpoints[0].Volume);
+    }
+
+    [Fact]
+    public async Task StaleLaterOperationStopsItsWriteAndRollsBackEarlierWrite()
+    {
+        EndpointDescriptor endpoint = TestData.Endpoint("speakers", volume: new VolumeLevel(0.2), muted: false);
+        var adapter = new FakeControlAdapter([endpoint], [])
+        {
+            MutateOnCapture = (4, ChangeKind.EndpointMute, "speakers", null, true),
+        };
+        AudioScene scene = Scene(endpoints: [new(new(AudioDirection.Render, ExactId: "speakers"), new VolumeLevel(0.7), true)]);
+
+        ApplyResult result = await new SceneExecutor(adapter).ApplyAsync(scene);
+
+        Assert.Equal(ApplyOverallState.RolledBack, result.State);
+        Assert.Equal([OperationResultState.RolledBack, OperationResultState.Failed], result.Operations.Select(item => item.State));
+        Assert.Equal(2, adapter.Events.Count(item => item.StartsWith("write:EndpointVolume", StringComparison.Ordinal)));
+        Assert.DoesNotContain("write:EndpointMute", adapter.Events);
+        AudioSnapshot final = await adapter.CaptureAsync();
+        Assert.Equal(new VolumeLevel(0.2), final.Endpoints[0].Volume);
+        Assert.True(final.Endpoints[0].IsMuted);
+    }
+
+    [Fact]
     public async Task FailedWriteRollsBackEarlierChangesAndReportsBothFacts()
     {
         EndpointDescriptor endpoint = TestData.Endpoint(
@@ -321,6 +360,8 @@ public sealed class SceneExecutorTests
 
         public int? ThrowOnCapture { get; init; }
 
+        public (int Capture, ChangeKind Kind, string TargetId, double? Volume, bool? IsMuted)? MutateOnCapture { get; init; }
+
         public AdapterCapabilities Capabilities { get; } = new(true, true, true, null);
 
         public ValueTask<AudioSnapshot> CaptureAsync(
@@ -338,6 +379,20 @@ public sealed class SceneExecutorTests
             if (RemoveSessionsOnCapture == captureCount)
             {
                 sessions.Clear();
+            }
+
+            if (MutateOnCapture is { } mutation && mutation.Capture == captureCount)
+            {
+                int index = endpoints.FindIndex(endpoint => endpoint.StableId == mutation.TargetId);
+                if (index >= 0)
+                {
+                    endpoints[index] = mutation.Kind switch
+                    {
+                        ChangeKind.EndpointVolume => endpoints[index] with { Volume = new VolumeLevel(mutation.Volume!.Value) },
+                        ChangeKind.EndpointMute => endpoints[index] with { IsMuted = mutation.IsMuted },
+                        _ => endpoints[index],
+                    };
+                }
             }
 
             return ValueTask.FromResult(new AudioSnapshot(DateTimeOffset.UtcNow, [.. endpoints], [.. sessions]));

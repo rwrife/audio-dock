@@ -2,7 +2,7 @@
 
 **Audio Dock is a local-first Windows tray utility for people who switch between speakers, headsets, docks, and calls to save, preview, and safely apply named audio-device and per-app volume scenes.**
 
-> **Status:** the .NET 8 foundation, UI-independent scene model, deterministic matching/planning, transactional execution/undo, capability-probed Core Audio inventory and controls, component tests, and opt-in diagnostics are implemented. Tray behavior, persistence, packaging, and physical-Windows compatibility validation are not complete yet.
+> **Status:** the .NET 8 foundation, transactional Core Audio boundary, local scene/activity persistence, accessible editor/review workflow, tray menu, and opt-in configurable hotkeys are implemented. Packaging and physical-Windows compatibility/accessibility validation are not complete yet.
 
 ## Motivation
 
@@ -73,11 +73,11 @@ All scene creation, preview, apply, undo, export, and settings actions must be k
 - `src/AudioDock.Core` contains platform- and UI-independent scene, descriptor, capability, match, plan, transactional execution, apply-result, and bounded undo contracts.
 - `src/AudioDock.Windows` contains the narrow, disposable Core Audio COM boundary. It inventories metadata and performs only capability-probed role, volume, and mute writes; managed descriptors, commands, results, and diagnostics are the only values crossing into Core/UI.
 - `src/AudioDock.Diagnostics` is an opt-in, stdout-only inventory command; executable paths require an explicit flag.
-- `src/AudioDock.App` is a WPF host placeholder. It does not inventory or mutate audio.
+- `src/AudioDock.App` is the WPF/MVVM host for scene CRUD, capture/manual editing, match/capability review, before/after preview, apply/cancel/undo, durable activity, tray actions, and opt-in conflict-detected global hotkeys. Its view model depends on the Core workflow interface, not COM.
 - `tests/AudioDock.Core.Tests` exercises matching, planning, bounds, stale/ambiguous targets, transactional writes, verification, cancellation, rollback/undo, and fake-adapter failures without touching host audio state.
 - `tests/AudioDock.Windows.Tests` exercises the Windows adapter through fake native backends and includes a separately gated mutation test that restores the selected host endpoint in `finally`.
 
-The supported target remains **Windows 10 version 22H2 and Windows 11**. See [the inventory compatibility note](docs/compatibility.md) and [transactional apply evidence](docs/transactional-apply.md). Current automated results establish compilation and managed fake/component behavior; they are not evidence of physical-device, driver, protected-session, installer, or universal application compatibility.
+The supported target remains **Windows 10 version 22H2 and Windows 11**. See [the inventory compatibility note](docs/compatibility.md), [transactional apply evidence](docs/transactional-apply.md), and [accessibility implementation checklist](docs/accessibility-checklist.md). Current automated results establish compilation and managed fake/component behavior; they are not evidence of physical-device, driver, protected-session, installer, assistive-technology, or universal application compatibility.
 
 ## Development quickstart
 

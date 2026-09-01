@@ -2,15 +2,116 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Audio Dock"
-        Width="640"
-        Height="360"
+        Width="1180"
+        Height="760"
+        MinWidth="820"
+        MinHeight="600"
         WindowStartupLocation="CenterScreen">
-  <Grid Margin="32">
-    <StackPanel VerticalAlignment="Center">
-      <TextBlock FontSize="28" FontWeight="SemiBold" Text="Audio Dock" />
-      <TextBlock Margin="0,12,0,0"
-                 TextWrapping="Wrap"
-                 Text="Read-only inventory is available through AudioDock.Diagnostics. Scene editing and audio mutation are not implemented in this UI." />
+  <Window.Resources>
+    <Style TargetType="Control">
+      <Setter Property="Margin" Value="3" />
+      <Setter Property="MinHeight" Value="32" />
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style TargetType="TextBlock"><Setter Property="Margin" Value="3" /><Setter Property="FontSize" Value="14" /></Style>
+  </Window.Resources>
+  <Grid Margin="16">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <StackPanel Grid.Row="0">
+      <TextBlock FontSize="28" FontWeight="SemiBold" Text="Audio Dock" AutomationProperties.Name="Audio Dock heading" />
+      <TextBlock TextWrapping="Wrap" Text="Local-only scene metadata and settings are stored under Local Application Data. Audio Dock never reads audio samples. Applying is always preceded by a reviewable preview." />
     </StackPanel>
+    <TabControl x:Name="WorkflowTabs" Grid.Row="1" AutomationProperties.Name="Audio Dock workflows">
+      <TabItem Header="_Scenes" AutomationProperties.Name="Scenes">
+        <Grid Margin="8">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="260"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+          <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+          <DockPanel Grid.Column="0">
+            <TextBlock DockPanel.Dock="Top" FontWeight="Bold" Text="Named scenes" />
+            <ListBox x:Name="SceneList" ItemsSource="{Binding Scenes}" SelectedItem="{Binding SelectedScene}" DisplayMemberPath="Name" AutomationProperties.Name="Named scenes" />
+          </DockPanel>
+          <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+              <TextBlock FontSize="20" FontWeight="SemiBold" Text="Create and edit" />
+              <TextBlock Text="Scene name" />
+              <TextBox Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Scene name" />
+              <WrapPanel>
+                <Button Content="_New manual" Command="{Binding NewCommand}" AutomationProperties.Name="Create blank scene for manual editing" />
+                <Button Content="_Capture current" Command="{Binding CaptureCommand}" AutomationProperties.Name="Capture current audio controls as a scene" />
+                <Button Content="_Rename" Command="{Binding RenameCommand}" />
+                <Button Content="D_uplicate" Command="{Binding DuplicateCommand}" />
+                <Button Content="_Delete" Command="{Binding DeleteCommand}" />
+              </WrapPanel>
+              <TextBlock TextWrapping="Wrap" Text="Manual scenes start empty. Capture can populate endpoint roles, endpoint volume/mute, and running application volume/mute without executable paths. Rename or duplicate to refine a captured scene." />
+              <GroupBox Header="Manual rules" AutomationProperties.Name="Manual scene rule editor">
+                <StackPanel>
+                  <TextBlock Text="Endpoint role and control rules (select a row to edit it)"/>
+                  <WrapPanel>
+                    <ComboBox Width="110" ItemsSource="{Binding Directions}" SelectedItem="{Binding ManualDirection}" AutomationProperties.Name="Endpoint direction"/>
+                    <ComboBox Width="140" ItemsSource="{Binding Roles}" SelectedItem="{Binding ManualRole}" AutomationProperties.Name="Default audio role"/>
+                    <TextBox Width="300" MaxLength="512" Text="{Binding ManualEndpointId, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Exact endpoint ID"/>
+                    <TextBox Width="80" Text="{Binding ManualEndpointVolume, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Endpoint volume, blank or zero through one"/>
+                    <CheckBox IsThreeState="True" IsChecked="{Binding ManualEndpointMute}" Content="Mute (mixed = unchanged)" AutomationProperties.Name="Endpoint mute; mixed means unchanged"/>
+                  </WrapPanel>
+                  <WrapPanel><Button Content="Add role" Command="{Binding AddRoleRuleCommand}"/><Button Content="Change role" Command="{Binding ChangeRoleRuleCommand}"/><Button Content="Remove role" Command="{Binding RemoveRoleRuleCommand}"/><Button Content="Add endpoint" Command="{Binding AddEndpointRuleCommand}"/><Button Content="Change endpoint" Command="{Binding ChangeEndpointRuleCommand}"/><Button Content="Remove endpoint" Command="{Binding RemoveEndpointRuleCommand}"/></WrapPanel>
+                  <DataGrid ItemsSource="{Binding RoleRules}" SelectedIndex="{Binding SelectedRoleIndex}" AutoGenerateColumns="True" IsReadOnly="True" CanUserAddRows="False" MaxHeight="150" AutomationProperties.Name="Default role rules"/>
+                  <DataGrid ItemsSource="{Binding EndpointRules}" SelectedIndex="{Binding SelectedEndpointIndex}" AutoGenerateColumns="True" IsReadOnly="True" CanUserAddRows="False" MaxHeight="150" AutomationProperties.Name="Endpoint volume and mute rules"/>
+                  <TextBlock Text="Application control rules (select a row to edit it)"/>
+                  <WrapPanel><TextBox Width="300" MaxLength="512" Text="{Binding ManualApplication, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Application process name"/><TextBox Width="80" Text="{Binding ManualApplicationVolume, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Application volume, blank or zero through one"/><CheckBox IsThreeState="True" IsChecked="{Binding ManualApplicationMute}" Content="Mute (mixed = unchanged)" AutomationProperties.Name="Application mute; mixed means unchanged"/><Button Content="Add application" Command="{Binding AddApplicationRuleCommand}"/><Button Content="Change application" Command="{Binding ChangeApplicationRuleCommand}"/><Button Content="Remove application" Command="{Binding RemoveApplicationRuleCommand}"/></WrapPanel>
+                  <DataGrid ItemsSource="{Binding ApplicationRules}" SelectedIndex="{Binding SelectedApplicationIndex}" AutoGenerateColumns="True" IsReadOnly="True" CanUserAddRows="False" MaxHeight="150" AutomationProperties.Name="Application volume and mute rules"/>
+                </StackPanel>
+              </GroupBox>
+              <Separator Margin="3,12" />
+              <TextBlock FontSize="20" FontWeight="SemiBold" Text="Match and capability review" />
+              <Button HorizontalAlignment="Left" Content="_Preview selected scene" Command="{Binding PreviewCommand}" AutomationProperties.HelpText="Reads current metadata and prepares a plan; does not mutate audio." />
+              <DataGrid ItemsSource="{Binding MatchReviews}" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column" AutomationProperties.Name="Endpoint and application match quality">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Type" Binding="{Binding Kind}" Width="90"/><DataGridTextColumn Header="Target" Binding="{Binding Target}" Width="*"/>
+                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="95"/><DataGridTextColumn Header="Quality / non-color cue" Binding="{Binding Quality}" Width="2*"/>
+                  <DataGridTextColumn Header="Score" Binding="{Binding Score}" Width="70"/><DataGridTextColumn Header="Capabilities" Binding="{Binding Capability}" Width="2*"/>
+                </DataGrid.Columns>
+              </DataGrid>
+              <TextBlock FontSize="20" FontWeight="SemiBold" Text="Before / after apply plan" Margin="3,12,3,3" />
+              <DataGrid ItemsSource="{Binding PlanChanges}" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" AutomationProperties.Name="Reviewable before and after plan">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="#" Binding="{Binding Sequence}" Width="40"/><DataGridTextColumn Header="Action" Binding="{Binding Kind}" Width="120"/>
+                  <DataGridTextColumn Header="Target" Binding="{Binding Target}" Width="*"/><DataGridTextColumn Header="Before" Binding="{Binding Before}" Width="120"/>
+                  <DataGridTextColumn Header="After" Binding="{Binding After}" Width="120"/><DataGridTextColumn Header="Outcome cue" Binding="{Binding Disposition}" Width="100"/>
+                  <DataGridTextColumn Header="Explanation" Binding="{Binding Explanation}" Width="2*"/>
+                </DataGrid.Columns>
+              </DataGrid>
+              <CheckBox Content="I reviewed the before/after plan" IsChecked="{Binding ReviewConfirmed}" AutomationProperties.Name="Confirm plan review" />
+              <WrapPanel>
+                <Button Content="_Apply reviewed plan" Command="{Binding ApplyCommand}" />
+                <Button Content="_Cancel safely" Command="{Binding CancelCommand}" AutomationProperties.HelpText="Stops at the next safe operation boundary and rolls back completed writes." />
+                <Button Content="_Undo latest apply" Command="{Binding UndoCommand}" />
+              </WrapPanel>
+            </StackPanel>
+          </ScrollViewer>
+        </Grid>
+      </TabItem>
+      <TabItem Header="_Activity" AutomationProperties.Name="Durable apply activity">
+        <Grid Margin="8"><Grid.ColumnDefinitions><ColumnDefinition Width="340"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+          <ListBox ItemsSource="{Binding Activity}" SelectedItem="{Binding SelectedActivity}" DisplayMemberPath="Summary" AutomationProperties.Name="Durable activity records" />
+          <DataGrid Grid.Column="2" ItemsSource="{Binding ActivityOperations}" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" AutomationProperties.Name="Partial failure operation details">
+            <DataGrid.Columns><DataGridTextColumn Header="#" Binding="{Binding Sequence}" Width="40"/><DataGridTextColumn Header="State" Binding="{Binding State}" Width="130"/><DataGridTextColumn Header="Target" Binding="{Binding Target}" Width="*"/><DataGridTextColumn Header="Detail" Binding="{Binding Detail}" Width="2*"/><DataGridTextColumn Header="Observed" Binding="{Binding ObservedValue}" Width="120"/></DataGrid.Columns>
+          </DataGrid>
+        </Grid>
+      </TabItem>
+      <TabItem Header="_Settings" AutomationProperties.Name="Settings and global hotkeys">
+        <StackPanel Margin="12" MaxWidth="720" HorizontalAlignment="Left">
+          <TextBlock FontSize="20" FontWeight="SemiBold" Text="Global hotkey" />
+          <TextBlock TextWrapping="Wrap" Text="Global hotkeys are off by default. The configurable chord applies the currently selected named scene. Windows reports a conflict if another application already owns it." />
+          <CheckBox x:Name="HotkeyEnabled" Content="_Enable global hotkey (opt in)" Checked="HotkeySettingChanged" Unchecked="HotkeySettingChanged" AutomationProperties.Name="Enable global hotkey" />
+          <WrapPanel><TextBlock VerticalAlignment="Center" Text="Modifiers"/><ComboBox x:Name="HotkeyModifiers" Width="160" SelectionChanged="HotkeySettingChanged"><ComboBoxItem Content="Control+Alt" IsSelected="True"/><ComboBoxItem Content="Control+Shift"/><ComboBoxItem Content="Alt+Shift"/></ComboBox><TextBlock VerticalAlignment="Center" Text="Key"/><TextBox x:Name="HotkeyKey" Width="80" MaxLength="1" Text="D" TextChanged="HotkeySettingChanged" AutomationProperties.Name="Global hotkey letter"/></WrapPanel>
+          <Button HorizontalAlignment="Left" Content="Disable hotkeys now" Click="DisableHotkeysClick" />
+          <TextBlock x:Name="HotkeyStatus" Text="Hotkeys disabled." AutomationProperties.LiveSetting="Polite" />
+          <Separator Margin="3,16"/><TextBlock FontWeight="Bold" Text="Accessibility verification targets"/><TextBlock TextWrapping="Wrap" Text="Every action is keyboard reachable; labels and programmatic names describe purpose; focus follows visual order and uses a visible system focus cue; layouts scroll/reflow at 200%; system colors support high contrast; status, missing, ambiguous, success, and failure include text—not color alone."/>
+        </StackPanel>
+      </TabItem>
+    </TabControl>
+    <Border Grid.Row="2" BorderThickness="1" BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" Padding="8" Margin="0,8,0,0">
+      <TextBlock Text="{Binding Status}" TextWrapping="Wrap" AutomationProperties.Name="Current operation status" AutomationProperties.LiveSetting="Polite" />
+    </Border>
   </Grid>
 </Window>

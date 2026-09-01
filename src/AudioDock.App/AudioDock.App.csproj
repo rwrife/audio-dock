@@ -4,7 +4,8 @@
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <UseWPF>true</UseWPF>
-    <Description>Placeholder WPF host for the future accessible Audio Dock UI.</Description>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Description>Accessible Audio Dock scene editor, review, tray, and opt-in hotkey host.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\AudioDock.Core\AudioDock.Core.csproj" />

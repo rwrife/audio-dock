@@ -29,6 +29,33 @@ public sealed class SceneExecutor
         DateTimeOffset startedAt = DateTimeOffset.UtcNow;
         AudioSnapshot preState = await adapter.CaptureAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         ScenePlan plan = ScenePlanner.Plan(scene, preState);
+        return await ExecutePlanAsync(plan, startedAt, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async ValueTask<ApplyResult> ApplyAsync(
+        AudioScene reviewedScene,
+        ScenePlan reviewedPlan,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reviewedScene);
+        ArgumentNullException.ThrowIfNull(reviewedPlan);
+        if (reviewedScene.Id != reviewedPlan.SceneId)
+        {
+            throw new StaleScenePreviewException("The reviewed scene and plan do not match. Preview the scene again.");
+        }
+        DateTimeOffset startedAt = DateTimeOffset.UtcNow;
+        AudioSnapshot preState = await adapter.CaptureAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        ScenePlan currentPlan = ScenePlanner.Plan(reviewedScene, preState);
+        if (!PlansMatch(reviewedPlan, currentPlan))
+        {
+            throw new StaleScenePreviewException("Audio state changed after preview. Review a new preview before applying; no writes were made.");
+        }
+
+        return await ExecutePlanAsync(reviewedPlan, startedAt, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask<ApplyResult> ExecutePlanAsync(ScenePlan plan, DateTimeOffset startedAt, CancellationToken cancellationToken)
+    {
         var results = new List<OperationResult>(plan.Changes.Count);
         var rollbackCommands = new List<AudioControlCommand>();
 
@@ -47,7 +74,7 @@ public sealed class SceneExecutor
                 results.Add(new(change.Sequence, change.Kind, change.Target, OperationResultState.Skipped,
                     "Canceled at a safe operation boundary."));
                 AppendNotAttempted(plan, results, change.Sequence);
-                return await FinishInterruptedAsync(scene.Id, startedAt, results, rollbackCommands, true).ConfigureAwait(false);
+                return await FinishInterruptedAsync(plan.SceneId, startedAt, results, rollbackCommands, true).ConfigureAwait(false);
             }
 
             (AudioSnapshot? current, string? captureFailure) = await CaptureSafelyAsync().ConfigureAwait(false);
@@ -56,7 +83,7 @@ public sealed class SceneExecutor
                 results.Add(new(change.Sequence, change.Kind, change.Target, OperationResultState.Failed,
                     captureFailure!));
                 AppendNotAttempted(plan, results, change.Sequence);
-                return await FinishInterruptedAsync(scene.Id, startedAt, results, rollbackCommands, false).ConfigureAwait(false);
+                return await FinishInterruptedAsync(plan.SceneId, startedAt, results, rollbackCommands, false).ConfigureAwait(false);
             }
 
             AudioControlCommand? command = Resolve(change, current, out string? resolutionFailure);
@@ -67,7 +94,15 @@ public sealed class SceneExecutor
                 continue;
             }
 
-            AudioControlCommand? rollback = CreateRollbackCommand(command, preState);
+            if (!StillMatchesReviewedBefore(change, command, current))
+            {
+                results.Add(new(change.Sequence, change.Kind, change.Target, OperationResultState.Failed,
+                    "Audio state changed after preview at the final write boundary. Re-preview before applying; this write was not made."));
+                AppendNotAttempted(plan, results, change.Sequence);
+                return await FinishInterruptedAsync(plan.SceneId, startedAt, results, rollbackCommands, false).ConfigureAwait(false);
+            }
+
+            AudioControlCommand? rollback = CreateRollbackCommand(command, current);
             if (rollback is null)
             {
                 results.Add(new(change.Sequence, change.Kind, change.Target, OperationResultState.Skipped,
@@ -82,7 +117,7 @@ public sealed class SceneExecutor
             {
                 results.Add(new(change.Sequence, change.Kind, change.Target, OperationResultState.Failed, write.Detail));
                 AppendNotAttempted(plan, results, change.Sequence);
-                return await FinishInterruptedAsync(scene.Id, startedAt, results, rollbackCommands, false).ConfigureAwait(false);
+                return await FinishInterruptedAsync(plan.SceneId, startedAt, results, rollbackCommands, false).ConfigureAwait(false);
             }
 
             (AudioSnapshot? observed, captureFailure) = await CaptureSafelyAsync().ConfigureAwait(false);
@@ -91,7 +126,7 @@ public sealed class SceneExecutor
                 results.Add(new(change.Sequence, change.Kind, change.Target, OperationResultState.Failed,
                     captureFailure!));
                 AppendNotAttempted(plan, results, change.Sequence);
-                return await FinishInterruptedAsync(scene.Id, startedAt, results, rollbackCommands, false).ConfigureAwait(false);
+                return await FinishInterruptedAsync(plan.SceneId, startedAt, results, rollbackCommands, false).ConfigureAwait(false);
             }
 
             if (!Verify(command, observed, out string observedValue))
@@ -99,7 +134,7 @@ public sealed class SceneExecutor
                 results.Add(new(change.Sequence, change.Kind, change.Target, OperationResultState.VerificationMismatch,
                     "The observable state did not match the requested value.", observedValue));
                 AppendNotAttempted(plan, results, change.Sequence);
-                return await FinishInterruptedAsync(scene.Id, startedAt, results, rollbackCommands, false).ConfigureAwait(false);
+                return await FinishInterruptedAsync(plan.SceneId, startedAt, results, rollbackCommands, false).ConfigureAwait(false);
             }
 
             results.Add(new(change.Sequence, change.Kind, change.Target, OperationResultState.Applied,
@@ -121,8 +156,11 @@ public sealed class SceneExecutor
         RollbackFact rollbackFact = undo is null
             ? new(RollbackState.NotRequired, null, "No audio state changed.")
             : new(RollbackState.Available, undo.Id, "One bounded pre-apply snapshot is available for undo.");
-        return new(scene.Id, state, startedAt, DateTimeOffset.UtcNow, results, rollbackFact);
+        return new(plan.SceneId, state, startedAt, DateTimeOffset.UtcNow, results, rollbackFact);
     }
+
+    private static bool PlansMatch(ScenePlan reviewed, ScenePlan current) =>
+        reviewed.SceneId == current.SceneId && reviewed.Changes.SequenceEqual(current.Changes);
 
     public async ValueTask<RollbackFact> UndoAsync(Guid snapshotId)
     {
@@ -297,6 +335,34 @@ public sealed class SceneExecutor
         ChangeKind.SessionMute => session.Capabilities.CanSetMute,
         _ => false,
     };
+
+    private static bool StillMatchesReviewedBefore(
+        PlannedChange change,
+        AudioControlCommand command,
+        AudioSnapshot snapshot)
+    {
+        if (change.ResolvedTargetId != command.TargetId) return false;
+
+        if (command.Kind == ChangeKind.DefaultRole)
+        {
+            string owner = snapshot.Endpoints.FirstOrDefault(endpoint =>
+                endpoint.Direction == command.Direction && command.Role is not null &&
+                endpoint.DefaultRoles.Contains(command.Role.Value))?.StableId ?? "none";
+            return owner == change.Before;
+        }
+
+        EndpointDescriptor? endpoint = snapshot.Endpoints.FirstOrDefault(candidate => candidate.StableId == command.TargetId);
+        SessionDescriptor? session = snapshot.Sessions.FirstOrDefault(candidate => candidate.SessionId == command.TargetId);
+        string current = command.Kind switch
+        {
+            ChangeKind.EndpointVolume => endpoint?.Volume?.ToString() ?? "unknown",
+            ChangeKind.EndpointMute => Format(endpoint?.IsMuted),
+            ChangeKind.SessionVolume => session?.Volume?.ToString() ?? "unknown",
+            ChangeKind.SessionMute => Format(session?.IsMuted),
+            _ => throw new ArgumentOutOfRangeException(nameof(command), command.Kind, null),
+        };
+        return current == change.Before;
+    }
 
     private static AudioControlCommand? CreateRollbackCommand(AudioControlCommand command, AudioSnapshot snapshot)
     {
