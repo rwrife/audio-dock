@@ -18,4 +18,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\AudioDock.Core\AudioDock.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\src\AudioDock.App\ViewModels\Commands.cs" Link="ViewModels\Commands.cs" />
+    <Compile Include="..\..\src\AudioDock.App\ViewModels\MainViewModel.cs" Link="ViewModels\MainViewModel.cs" />
+    <Compile Include="..\..\src\AudioDock.App\ViewModels\TrayHotkeyState.cs" Link="ViewModels\TrayHotkeyState.cs" />
+  </ItemGroup>
 </Project>

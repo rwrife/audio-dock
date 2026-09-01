@@ -196,6 +196,7 @@ public static class ScenePlanner
         return new ScenePlan(scene.Id, changes);
     }
 
+
     private static string Describe(EndpointMatchRule rule) =>
         rule.UserAlias ?? rule.FriendlyName ?? rule.Product ?? rule.ExactId ?? $"{rule.Direction} endpoint";
 

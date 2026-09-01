@@ -11,7 +11,8 @@ public sealed record OperationResult(
 public sealed record RollbackFact(
     RollbackState State,
     Guid? SnapshotId,
-    string Detail);
+    string Detail,
+    string? ActivityPersistenceFailure = null);
 
 public sealed record ApplyResult(
     Guid SceneId,
@@ -19,4 +20,5 @@ public sealed record ApplyResult(
     DateTimeOffset StartedAt,
     DateTimeOffset CompletedAt,
     IReadOnlyList<OperationResult> Operations,
-    RollbackFact Rollback);
+    RollbackFact Rollback,
+    string? ActivityPersistenceFailure = null);
