@@ -7,6 +7,10 @@ public interface ISceneStore
     ValueTask<IReadOnlyList<AudioScene>> LoadAsync(CancellationToken cancellationToken = default);
 
     ValueTask SaveAsync(IReadOnlyCollection<AudioScene> scenes, CancellationToken cancellationToken = default);
+
+    ValueTask<IReadOnlyList<AudioScene>> MutateAsync(
+        Func<IReadOnlyList<AudioScene>, IReadOnlyCollection<AudioScene>> mutation,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IActivityStore

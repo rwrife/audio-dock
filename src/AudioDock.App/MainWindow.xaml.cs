@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Text.Json;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
@@ -11,6 +10,9 @@ using AudioDock.Core.Persistence;
 using AudioDock.Core.Workflow;
 using AudioDock.Windows;
 using Forms = System.Windows.Forms;
+using MessageBox = System.Windows.MessageBox;
+using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
+using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
 
 namespace AudioDock.App;
 
@@ -21,7 +23,11 @@ public partial class MainWindow : Window, IDisposable
     private readonly WindowsAudioInventory adapter;
     private readonly MainViewModel viewModel;
     private readonly Forms.NotifyIcon tray;
-    private readonly string settingsPath;
+    private readonly string dataRoot;
+    private readonly JsonSettingsStore settingsStore;
+    private readonly SceneTransferService transfers;
+    private readonly LocalDataMaintenance maintenance;
+    private readonly LocalDiagnosticStore diagnostics;
     private HwndSource? source;
     private bool hotkeyRegistered;
     private bool hotkeysPaused;
@@ -35,10 +41,15 @@ public partial class MainWindow : Window, IDisposable
     public MainWindow()
     {
         InitializeComponent();
-        string data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AudioDock");
-        settingsPath = Path.Combine(data, "settings.json");
+        dataRoot = AudioDockDataPaths.DefaultRoot;
+        settingsStore = new(AudioDockDataPaths.Settings(dataRoot));
+        var sceneStore = new JsonSceneStore(AudioDockDataPaths.Scenes(dataRoot));
+        diagnostics = new(AudioDockDataPaths.Diagnostics(dataRoot));
+        transfers = new(sceneStore, diagnostics);
+        maintenance = new(dataRoot, diagnostics, sceneStore);
         adapter = new WindowsAudioInventory();
-        var workflow = new SceneWorkflow(adapter, new JsonSceneStore(Path.Combine(data, "scenes.json")), new JsonActivityStore(Path.Combine(data, "activity.json")));
+        var workflow = new SceneWorkflow(adapter, sceneStore, new JsonActivityStore(AudioDockDataPaths.Activity(dataRoot)),
+            () => AllowExecutablePaths.IsChecked == true, diagnostics);
         viewModel = new(workflow);
         DataContext = viewModel;
         tray = new Forms.NotifyIcon
@@ -52,6 +63,7 @@ public partial class MainWindow : Window, IDisposable
         Loaded += OnLoaded;
         Closing += OnClosing;
         Closed += OnClosed;
+        DataLocationText.Text = $"Data location: {maintenance.DataLocation}";
     }
 
     private async void OnClosing(object? sender, CancelEventArgs e)
@@ -241,12 +253,11 @@ public partial class MainWindow : Window, IDisposable
     {
         try
         {
-            if (!File.Exists(settingsPath)) return;
-            HotkeyPreferences? settings = JsonSerializer.Deserialize<HotkeyPreferences>(File.ReadAllText(settingsPath));
-            if (settings is null) return;
-            HotkeyEnabled.IsChecked = settings.Enabled;
-            HotkeyModifiers.SelectedIndex = Math.Clamp(settings.ModifierChoice, 0, 2);
-            HotkeyKey.Text = settings.Key;
+            AppSettings settings = settingsStore.LoadAsync().AsTask().GetAwaiter().GetResult();
+            HotkeyEnabled.IsChecked = settings.HotkeyEnabled;
+            HotkeyModifiers.SelectedIndex = settings.HotkeyModifierChoice;
+            HotkeyKey.Text = settings.HotkeyKey;
+            AllowExecutablePaths.IsChecked = settings.AllowExecutablePathMatching;
         }
         catch (Exception exception)
         {
@@ -254,18 +265,129 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private void SaveSettings()
+    private async void SaveSettings()
     {
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
-            File.WriteAllText(settingsPath, JsonSerializer.Serialize(new HotkeyPreferences(
-                HotkeyEnabled.IsChecked == true, HotkeyModifiers.SelectedIndex, HotkeyKey.Text.Trim().ToUpperInvariant())));
+            await settingsStore.SaveAsync(new(AppSettings.CurrentSchemaVersion,
+                HotkeyEnabled.IsChecked == true, HotkeyModifiers.SelectedIndex, HotkeyKey.Text.Trim().ToUpperInvariant(),
+                AllowExecutablePaths.IsChecked == true));
         }
         catch (Exception exception)
         {
             HotkeyStatus.Text = $"Settings could not be saved: {exception.Message}";
         }
+    }
+
+    private async void ExportScenesClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dialog = new SaveFileDialog { Filter = "Audio Dock scenes (*.json)|*.json", FileName = "AudioDock-scenes.json" };
+            if (dialog.ShowDialog(this) != true) return;
+            SceneExportResult result = await transfers.ExportAsync(dialog.FileName);
+            MessageBox.Show(this, $"Exported {result.SceneCount} scene(s). {result.PortabilityWarning}", "Export complete");
+        }
+        catch (Exception exception) { MessageBox.Show(this, exception.Message, "Export failed", MessageBoxButton.OK, MessageBoxImage.Error); }
+    }
+
+    private async void BackupScenesClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dialog = new SaveFileDialog { Filter = "Audio Dock backup (*.json)|*.json", FileName = "AudioDock-backup.json" };
+            if (dialog.ShowDialog(this) != true) return;
+            SceneExportResult result = await transfers.BackupAsync(dialog.FileName);
+            MessageBox.Show(this, $"Backed up {result.SceneCount} scene(s). {result.PortabilityWarning}", "Backup complete");
+        }
+        catch (Exception exception) { MessageBox.Show(this, exception.Message, "Backup failed", MessageBoxButton.OK, MessageBoxImage.Error); }
+    }
+
+    private async void ImportScenesClick(object sender, RoutedEventArgs e)
+    {
+        try { await PreviewAndImportAsync("Import scenes"); }
+        catch (Exception exception) { MessageBox.Show(this, $"Import could not start; no data or audio state changed. {exception.Message}", "Import failed", MessageBoxButton.OK, MessageBoxImage.Error); }
+    }
+
+    private async void RestoreScenesClick(object sender, RoutedEventArgs e)
+    {
+        try { await PreviewAndImportAsync("Restore backup"); }
+        catch (Exception exception) { MessageBox.Show(this, $"Restore could not start; no data or audio state changed. {exception.Message}", "Restore failed", MessageBoxButton.OK, MessageBoxImage.Error); }
+    }
+
+    private async Task PreviewAndImportAsync(string title)
+    {
+        bool committed = false;
+        try
+        {
+            var dialog = new OpenFileDialog { Filter = "Audio Dock JSON (*.json)|*.json" };
+            if (dialog.ShowDialog(this) != true) return;
+            SceneImportPreview preview = await transfers.PreviewImportAsync(dialog.FileName);
+            MessageBoxResult choice = MessageBox.Show(this,
+                $"Validated {preview.Incoming.Count} scene(s); {preview.Conflicts.Count} ID conflict(s). {preview.PortabilityWarning}\n\nYes: merge (incoming wins conflicts)\nNo: replace all scenes\nCancel: make no changes",
+                $"{title} conflict preview", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+            if (choice == MessageBoxResult.Cancel) return;
+            await transfers.ApplyImportAsync(preview, choice == MessageBoxResult.Yes ? SceneConflictChoice.Merge : SceneConflictChoice.Replace);
+            committed = true;
+            viewModel.Scenes.Clear();
+            foreach (AudioScene scene in await new JsonSceneStore(AudioDockDataPaths.Scenes(dataRoot)).LoadAsync()) viewModel.Scenes.Add(scene);
+            viewModel.SelectedScene = viewModel.Scenes.FirstOrDefault();
+            MessageBox.Show(this, "Scenes stored. No audio settings were changed; preview a scene separately before applying it.", title);
+        }
+        catch (Exception exception)
+        {
+            string message = committed
+                ? $"Scenes were stored, but the on-screen list could not be refreshed. Reopen Audio Dock before applying a scene. {exception.Message}"
+                : $"No data or audio state was changed. {exception.Message}";
+            MessageBox.Show(this, message, $"{title} failed", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async void ClearScenesClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (MessageBox.Show(this, "Permanently clear every stored scene? This does not change audio.", "Clear all scenes", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+            await maintenance.ClearScenesAsync();
+            viewModel.Scenes.Clear();
+            viewModel.SelectedScene = null;
+            MessageBox.Show(this, "All stored scenes were cleared.", "Scenes cleared");
+        }
+        catch (Exception exception) { MessageBox.Show(this, $"Scenes could not be cleared: {exception.Message}", "Clear scenes failed", MessageBoxButton.OK, MessageBoxImage.Error); }
+    }
+    private async void ClearActivityClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await maintenance.ClearActivityAsync();
+            viewModel.Activity.Clear();
+            viewModel.SelectedActivity = null;
+            MessageBox.Show(this, "Stored activity was cleared.", "Activity cleared");
+        }
+        catch (Exception exception) { MessageBox.Show(this, $"Activity could not be cleared: {exception.Message}", "Clear activity failed", MessageBoxButton.OK, MessageBoxImage.Error); }
+    }
+    private async void ClearDiagnosticsClick(object sender, RoutedEventArgs e)
+    {
+        try { await diagnostics.ClearAsync(); MessageBox.Show(this, "Local diagnostics cleared.", "Diagnostics"); }
+        catch (Exception exception) { MessageBox.Show(this, $"Diagnostics could not be cleared: {exception.Message}", "Clear diagnostics failed", MessageBoxButton.OK, MessageBoxImage.Error); }
+    }
+    private async void InspectDiagnosticsClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            IReadOnlyList<DiagnosticEvent> items = await diagnostics.InspectAsync();
+            MessageBox.Show(this, items.Count == 0 ? "No local diagnostics are stored." : string.Join(Environment.NewLine, items.Take(20).Select(item => $"{item.OccurredAt:u} {item.Level} {item.Event}: {item.Detail}")), "Local redacted diagnostics");
+        }
+        catch (Exception exception) { MessageBox.Show(this, $"Diagnostics could not be inspected: {exception.Message}", "Inspect diagnostics failed", MessageBoxButton.OK, MessageBoxImage.Error); }
+    }
+    private void OpenDataLocationClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Directory.CreateDirectory(dataRoot);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", dataRoot) { UseShellExecute = true });
+        }
+        catch (Exception exception) { MessageBox.Show(this, $"The data folder could not be opened: {exception.Message}", "Open folder failed", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
     [DllImport("user32.dll", SetLastError = true)]
@@ -276,5 +398,4 @@ public partial class MainWindow : Window, IDisposable
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool UnregisterHotKey(IntPtr window, int id);
 
-    private sealed record HotkeyPreferences(bool Enabled, int ModifierChoice, string Key);
 }

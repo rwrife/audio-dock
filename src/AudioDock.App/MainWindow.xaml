@@ -85,6 +85,7 @@
                 <Button Content="_Apply reviewed plan" Command="{Binding ApplyCommand}" />
                 <Button Content="_Cancel safely" Command="{Binding CancelCommand}" AutomationProperties.HelpText="Stops at the next safe operation boundary and rolls back completed writes." />
                 <Button Content="_Undo latest apply" Command="{Binding UndoCommand}" />
+                <Button Content="Clear undo snapshot" Command="{Binding ClearUndoCommand}" AutomationProperties.HelpText="Clears only the in-memory rollback snapshot; does not change audio." />
               </WrapPanel>
             </StackPanel>
           </ScrollViewer>
@@ -106,6 +107,23 @@
           <WrapPanel><TextBlock VerticalAlignment="Center" Text="Modifiers"/><ComboBox x:Name="HotkeyModifiers" Width="160" SelectionChanged="HotkeySettingChanged"><ComboBoxItem Content="Control+Alt" IsSelected="True"/><ComboBoxItem Content="Control+Shift"/><ComboBoxItem Content="Alt+Shift"/></ComboBox><TextBlock VerticalAlignment="Center" Text="Key"/><TextBox x:Name="HotkeyKey" Width="80" MaxLength="1" Text="D" TextChanged="HotkeySettingChanged" AutomationProperties.Name="Global hotkey letter"/></WrapPanel>
           <Button HorizontalAlignment="Left" Content="Disable hotkeys now" Click="DisableHotkeysClick" />
           <TextBlock x:Name="HotkeyStatus" Text="Hotkeys disabled." AutomationProperties.LiveSetting="Polite" />
+          <Separator Margin="3,16"/><TextBlock FontSize="20" FontWeight="SemiBold" Text="Local data and privacy" />
+          <TextBlock x:Name="DataLocationText" TextWrapping="Wrap" AutomationProperties.Name="Audio Dock local data folder" />
+          <CheckBox x:Name="AllowExecutablePaths" Content="Allow optional executable-path matching (may disclose user or install details)" Checked="HotkeySettingChanged" Unchecked="HotkeySettingChanged" />
+          <WrapPanel>
+            <Button Content="Export scenes (redacted)" Click="ExportScenesClick" />
+            <Button Content="Import scenes" Click="ImportScenesClick" />
+            <Button Content="Create backup" Click="BackupScenesClick" />
+            <Button Content="Restore backup" Click="RestoreScenesClick" />
+          </WrapPanel>
+          <WrapPanel>
+            <Button Content="Clear all scenes" Click="ClearScenesClick" />
+            <Button Content="Clear activity" Click="ClearActivityClick" />
+            <Button Content="Inspect diagnostics" Click="InspectDiagnosticsClick" />
+            <Button Content="Clear diagnostics" Click="ClearDiagnosticsClick" />
+            <Button Content="Open data location" Click="OpenDataLocationClick" />
+          </WrapPanel>
+          <TextBlock TextWrapping="Wrap" Text="Audio Dock uses no account, network service, microphone content, audio recording, or administrator rights for normal use. Diagnostics contain local control events only, redact paths, are age/size bounded, and never contain audio content." />
           <Separator Margin="3,16"/><TextBlock FontWeight="Bold" Text="Accessibility verification targets"/><TextBlock TextWrapping="Wrap" Text="Every action is keyboard reachable; labels and programmatic names describe purpose; focus follows visual order and uses a visible system focus cue; layouts scroll/reflow at 200%; system colors support high contrast; status, missing, ambiguous, success, and failure include text—not color alone."/>
         </StackPanel>
       </TabItem>

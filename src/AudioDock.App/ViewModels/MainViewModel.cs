@@ -44,6 +44,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         ApplyCommand = new(() => _ = ApplyAsync(), () => Preview is not null && ReviewConfirmed && !Preview.RequiresResolution && !IsBusy);
         CancelCommand = new(() => { applyCancellation?.Cancel(); Status = "Cancellation requested; the current native write/read-back will finish before stopping."; }, () => IsBusy && applyCancellation is not null);
         UndoCommand = new(() => _ = UndoAsync(), () => undoId is not null && !IsBusy);
+        ClearUndoCommand = new(() => _ = ClearUndoAsync(), () => undoId is not null && !IsBusy);
         AddEndpointRuleCommand = new(() => _ = AddEndpointRuleAsync(), () => SelectedScene is not null && !IsBusy);
         AddApplicationRuleCommand = new(() => _ = AddApplicationRuleAsync(), () => SelectedScene is not null && !IsBusy);
         AddRoleRuleCommand = new(() => _ = UpsertRoleAsync(-1), () => SelectedScene is not null && !IsBusy);
@@ -66,6 +67,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public DelegateCommand ApplyCommand { get; }
     public DelegateCommand CancelCommand { get; }
     public DelegateCommand UndoCommand { get; }
+    public DelegateCommand ClearUndoCommand { get; }
     public DelegateCommand AddEndpointRuleCommand { get; }
     public DelegateCommand AddApplicationRuleCommand { get; }
     public DelegateCommand AddRoleRuleCommand { get; }
@@ -137,6 +139,15 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         if (Preview is { RequiresResolution: false }) { ReviewConfirmed = true; await ApplyAsync(); }
     }
     public async Task UndoLatestAsync() => await UndoAsync();
+
+    private async Task ClearUndoAsync()
+    {
+        await workflow.ClearUndoAsync();
+        undoId = null;
+        UndoCommand.Refresh();
+        ClearUndoCommand.Refresh();
+        Status = "The in-memory undo snapshot was cleared. Audio state was not changed.";
+    }
 
     public async Task CancelActiveOperationAndWaitAsync()
     {
@@ -218,6 +229,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 ScenePreview appliedPreview = Preview;
                 ApplyResult result = await workflow.ApplyAsync(appliedPreview, operationCancellation.Token);
                 undoId = result.Rollback.SnapshotId;
+                ClearUndoCommand.Refresh();
                 string summary = result.ActivityPersistenceFailure is null
                     ? $"Apply {result.State}: review operation details below."
                     : $"Apply {result.State}: in-memory only; activity history save failed.";
@@ -247,6 +259,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 ? $"Undo {result.State}: {result.Detail}"
                 : $"Undo {result.State}: {result.Detail} Durability warning: {result.ActivityPersistenceFailure}";
             UndoCommand.Refresh();
+            ClearUndoCommand.Refresh();
         });
     }
 
@@ -291,7 +304,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private void LoadEndpoint(int index) { if (index < 0 || SelectedScene is null) return; EndpointRule rule = SelectedScene.EndpointRules[index]; ManualDirection = rule.Match.Direction; ManualEndpointId = rule.Match.ExactId ?? string.Empty; ManualEndpointVolume = rule.Volume?.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty; ManualEndpointMute = rule.IsMuted; }
     private void LoadApplication(int index) { if (index < 0 || SelectedScene is null) return; ApplicationRule rule = SelectedScene.ApplicationRules[index]; ManualApplication = rule.Match.ProcessName ?? string.Empty; ManualApplicationVolume = rule.Volume?.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty; ManualApplicationMute = rule.IsMuted; }
     private void RaiseRuleLists() { Raise(nameof(RoleRules)); Raise(nameof(EndpointRules)); Raise(nameof(ApplicationRules)); }
-    private void RefreshCommands() { NewCommand.Refresh(); CaptureCommand.Refresh(); RenameCommand.Refresh(); DuplicateCommand.Refresh(); DeleteCommand.Refresh(); PreviewCommand.Refresh(); ApplyCommand.Refresh(); CancelCommand.Refresh(); UndoCommand.Refresh(); AddEndpointRuleCommand.Refresh(); AddApplicationRuleCommand.Refresh(); AddRoleRuleCommand.Refresh(); ChangeRoleRuleCommand.Refresh(); RemoveRoleRuleCommand.Refresh(); ChangeEndpointRuleCommand.Refresh(); RemoveEndpointRuleCommand.Refresh(); ChangeApplicationRuleCommand.Refresh(); RemoveApplicationRuleCommand.Refresh(); }
+    private void RefreshCommands() { NewCommand.Refresh(); CaptureCommand.Refresh(); RenameCommand.Refresh(); DuplicateCommand.Refresh(); DeleteCommand.Refresh(); PreviewCommand.Refresh(); ApplyCommand.Refresh(); CancelCommand.Refresh(); UndoCommand.Refresh(); ClearUndoCommand.Refresh(); AddEndpointRuleCommand.Refresh(); AddApplicationRuleCommand.Refresh(); AddRoleRuleCommand.Refresh(); ChangeRoleRuleCommand.Refresh(); RemoveRoleRuleCommand.Refresh(); ChangeEndpointRuleCommand.Refresh(); RemoveEndpointRuleCommand.Refresh(); ChangeApplicationRuleCommand.Refresh(); RemoveApplicationRuleCommand.Refresh(); }
     private enum RuleKind { Role, Endpoint, Application }
     private static void Replace<T>(ObservableCollection<T> target, IEnumerable<T> values) { target.Clear(); foreach (T value in values) target.Add(value); }
 

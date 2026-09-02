@@ -1,12 +1,44 @@
 using System.Runtime.CompilerServices;
 using AudioDock.Core.Abstractions;
 using AudioDock.Core.Models;
+using AudioDock.Core.Persistence;
 using AudioDock.Core.Workflow;
 
 namespace AudioDock.Core.Tests.Workflow;
 
 public sealed class SceneWorkflowTests
 {
+    [Fact]
+    public async Task ApplyAndUndoWritePrivacySafeDiagnosticsWithoutAffectingActivityPersistenceStatus()
+    {
+        var diagnostics = new RecordingDiagnostics();
+        EndpointDescriptor endpoint = TestData.Endpoint("secret-target", volume: new(0.2));
+        var scene = new AudioScene(1, Guid.NewGuid(), "Private scene", endpointRules:
+            [new(new(AudioDirection.Render, ExactId: "secret-target"), new(0.8))]);
+        var workflow = new SceneWorkflow(new MutableAdapter(endpoint), new MemorySceneStore(), new MemoryActivityStore(), diagnostics: diagnostics);
+        ScenePreview preview = await workflow.PreviewAsync(scene);
+
+        ApplyResult apply = await workflow.ApplyAsync(preview);
+        await workflow.UndoAsync(apply.Rollback.SnapshotId!.Value, scene.Name);
+
+        Assert.Null(apply.ActivityPersistenceFailure);
+        Assert.Contains(diagnostics.Events, item => item.Event == "scene_apply");
+        Assert.Contains(diagnostics.Events, item => item.Event == "scene_undo");
+        Assert.DoesNotContain("Private scene", string.Join(" ", diagnostics.Events.Select(item => item.Detail)));
+        Assert.DoesNotContain(scene.Id.ToString(), string.Join(" ", diagnostics.Events.Select(item => item.Detail)));
+        Assert.DoesNotContain("secret-target", string.Join(" ", diagnostics.Events.Select(item => item.Detail)));
+    }
+
+    [Fact]
+    public async Task DiagnosticFailureDoesNotReportActivityPersistenceFailure()
+    {
+        var scene = new AudioScene(1, Guid.NewGuid(), "Scene");
+        var workflow = new SceneWorkflow(new FakeAdapter([], []), new MemorySceneStore(), new MemoryActivityStore(), diagnostics: new ThrowingDiagnostics());
+
+        ApplyResult result = await workflow.ApplyAsync(await workflow.PreviewAsync(scene));
+
+        Assert.Null(result.ActivityPersistenceFailure);
+    }
     [Fact]
     public async Task CaptureCurrentCreatesPortableRulesWithoutExecutablePathsOrAudioContent()
     {
@@ -41,6 +73,17 @@ public sealed class SceneWorkflowTests
         PlannedChange change = Assert.Single(preview.Plan.Changes);
         Assert.Equal("0.6", change.After);
         Assert.Equal(PlanDisposition.Skipped, change.Disposition);
+    }
+
+    [Fact]
+    public async Task ExecutablePathMatchingRequiresExplicitConsentBeforePreview()
+    {
+        AudioScene scene = new(AudioScene.CurrentSchemaVersion, Guid.NewGuid(), "Private",
+            applicationRules: [new(new(ExecutablePath: "C:\\Private\\player.exe"), new(0.5))]);
+        var blocked = new SceneWorkflow(new FakeAdapter([], []), new MemorySceneStore(), new MemoryActivityStore(), () => false);
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await blocked.PreviewAsync(scene));
+        var allowed = new SceneWorkflow(new FakeAdapter([], []), new MemorySceneStore(), new MemoryActivityStore(), () => true);
+        Assert.Single((await allowed.PreviewAsync(scene)).Matches);
     }
 
     [Fact]
@@ -124,6 +167,18 @@ public sealed class SceneWorkflowTests
             appends++ == 0 ? ValueTask.FromException(new IOException("disk full")) : ValueTask.CompletedTask;
     }
 
+    private sealed class RecordingDiagnostics : IDiagnosticSink
+    {
+        public List<DiagnosticEvent> Events { get; } = [];
+        public ValueTask AppendAsync(DiagnosticEvent item, CancellationToken cancellationToken = default) { Events.Add(item); return ValueTask.CompletedTask; }
+    }
+
+    private sealed class ThrowingDiagnostics : IDiagnosticSink
+    {
+        public ValueTask AppendAsync(DiagnosticEvent item, CancellationToken cancellationToken = default) =>
+            ValueTask.FromException(new IOException("diagnostics unavailable"));
+    }
+
     private sealed class FailSecondAppendActivityStore : IActivityStore
     {
         private int appends;
@@ -152,6 +207,12 @@ public sealed class SceneWorkflowTests
         public IReadOnlyList<AudioScene> Values { get; private set; } = [];
         public ValueTask<IReadOnlyList<AudioScene>> LoadAsync(CancellationToken cancellationToken = default) => ValueTask.FromResult(Values);
         public ValueTask SaveAsync(IReadOnlyCollection<AudioScene> scenes, CancellationToken cancellationToken = default) { Values = [.. scenes]; return ValueTask.CompletedTask; }
+        public ValueTask<IReadOnlyList<AudioScene>> MutateAsync(Func<IReadOnlyList<AudioScene>, IReadOnlyCollection<AudioScene>> mutation,
+            CancellationToken cancellationToken = default)
+        {
+            Values = [.. mutation(Values)];
+            return ValueTask.FromResult(Values);
+        }
     }
 
     private sealed class MemoryActivityStore : IActivityStore

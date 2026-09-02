@@ -2,7 +2,7 @@
 
 **Audio Dock is a local-first Windows tray utility for people who switch between speakers, headsets, docks, and calls to save, preview, and safely apply named audio-device and per-app volume scenes.**
 
-> **Status:** the .NET 8 foundation, transactional Core Audio boundary, local scene/activity persistence, accessible editor/review workflow, tray menu, and opt-in configurable hotkeys are implemented. Packaging and physical-Windows compatibility/accessibility validation are not complete yet.
+> **Status:** the .NET 8 foundation, transactional Core Audio boundary, crash-safe versioned local persistence, validated import/export and backup/restore, bounded redacted diagnostics, accessible editor/review/data-control workflow, tray menu, and opt-in configurable hotkeys are implemented. Packaging and physical-Windows compatibility/accessibility validation are not complete yet.
 
 ## Motivation
 
@@ -55,6 +55,10 @@ Windows remembers some audio choices, but a dock, Bluetooth headset, game, meeti
 Audio Dock operates locally and never reads audio samples. It stores scene names, endpoint identifiers and friendly names, executable identity rules, requested volume/mute values, preferences, and bounded diagnostics under `%LOCALAPPDATA%\AudioDock`. It does not require microphone content access, network access, an account, or administrator rights for normal operation. A global-hotkey permission is not separately requested on Windows; any later startup registration is opt-in and reversible.
 
 Executable paths can reveal user information, so the UI makes path-based matching optional and export can redact paths in favor of publisher/product metadata. Diagnostics are local, bounded, inspectable, and clearable. Imports are validated before they can change system state. Applying a scene is always a user-visible action in the MVP.
+
+Scene and settings files use an explicit schema envelope and temporary-file atomic replacement. At startup, a complete primary file always wins over a stale temporary file; a complete supported temporary file is recovered only when the primary is absent or truncated. The committed legacy v1 scene array is migrated on read. Unknown future versions are rejected in place. Imports are limited to 4 MiB, 500 scenes, 2,000 rules per scene, and 512 characters per stored string, and are checked for schema, enum, volume, duplicate-ID, and match-rule errors before a conflict preview is returned. Import and restore only store data—they never apply scenes or write audio controls.
+
+Exports are deterministic and redact executable paths by default; a same-machine backup can explicitly retain them and displays a privacy/portability warning. Merge means incoming scenes replace matching IDs while retaining other local scenes; replace means the validated incoming set becomes the complete stored set. Both choices are explicit after conflict preview. The Settings tab exposes the exact data folder plus export, import, backup, restore, clear-all-scenes, clear activity, clear undo, inspect/clear diagnostics, and open-folder controls. Diagnostics retain at most 512 KiB and 14 days by default, redact Windows and Unix-style paths, expose structured event metadata rather than audio, and can be inspected or cleared locally.
 
 ## Accessibility
 
