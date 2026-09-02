@@ -2,6 +2,7 @@ using AudioDock.Core.Abstractions;
 using AudioDock.Core.Execution;
 using AudioDock.Core.Matching;
 using AudioDock.Core.Models;
+using AudioDock.Core.Persistence;
 
 namespace AudioDock.Core.Workflow;
 
@@ -14,9 +15,11 @@ public interface ISceneWorkflow
     ValueTask<ScenePreview> PreviewAsync(AudioScene scene, CancellationToken cancellationToken = default);
     ValueTask<ApplyResult> ApplyAsync(ScenePreview preview, CancellationToken cancellationToken = default);
     ValueTask<RollbackFact> UndoAsync(Guid snapshotId, string sceneName);
+    ValueTask ClearUndoAsync() => ValueTask.CompletedTask;
 }
 
-public sealed class SceneWorkflow(IAudioControlAdapter adapter, ISceneStore scenes, IActivityStore activities) : ISceneWorkflow
+public sealed class SceneWorkflow(IAudioControlAdapter adapter, ISceneStore scenes, IActivityStore activities,
+    Func<bool>? executablePathMatchingEnabled = null, IDiagnosticSink? diagnostics = null) : ISceneWorkflow
 {
     private readonly SceneExecutor executor = new(adapter);
 
@@ -42,6 +45,8 @@ public sealed class SceneWorkflow(IAudioControlAdapter adapter, ISceneStore scen
 
     public async ValueTask<ScenePreview> PreviewAsync(AudioScene scene, CancellationToken cancellationToken = default)
     {
+        if (scene.ApplicationRules.Any(rule => rule.Match.ExecutablePath is not null) && executablePathMatchingEnabled?.Invoke() != true)
+            throw new InvalidOperationException("This scene uses executable-path matching. Enable the explicit path-matching privacy setting before previewing it.");
         AudioScene reviewedScene = new(scene.SchemaVersion, scene.Id, scene.Name, scene.RoleTargets, scene.EndpointRules, scene.ApplicationRules);
         AudioSnapshot snapshot = await adapter.CaptureAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         ScenePlan generatedPlan = Planning.ScenePlanner.Plan(reviewedScene, snapshot);
@@ -76,6 +81,7 @@ public sealed class SceneWorkflow(IAudioControlAdapter adapter, ISceneStore scen
         {
             result = result with { ActivityPersistenceFailure = $"Activity history could not be saved: {exception.Message}" };
         }
+        await diagnostics.TryAppendAsync("scene_apply", $"Apply completed with state {result.State} and {result.Operations.Count} operations.");
         return result;
     }
 
@@ -90,8 +96,11 @@ public sealed class SceneWorkflow(IAudioControlAdapter adapter, ISceneStore scen
         {
             result = result with { ActivityPersistenceFailure = $"Activity history could not be saved: {exception.Message}" };
         }
+        await diagnostics.TryAppendAsync("scene_undo", $"Undo completed with state {result.State}.");
         return result;
     }
+
+    public ValueTask ClearUndoAsync() { executor.ClearUndo(); return ValueTask.CompletedTask; }
 
     private static EndpointMatchRule EndpointRuleFor(EndpointDescriptor endpoint) =>
         new(endpoint.Direction, endpoint.StableId, InterfaceId: endpoint.InterfaceId, ContainerId: endpoint.ContainerId,

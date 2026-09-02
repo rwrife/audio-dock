@@ -164,6 +164,21 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public async Task ClearUndoIsEnabledOnlyWhileUndoIsAvailableAndNotBusy()
+    {
+        var scene = new AudioScene(1, Guid.NewGuid(), "Desk");
+        var workflow = new FakeWorkflow { Initial = [scene], ApplyUndoId = Guid.NewGuid() };
+        var viewModel = new MainViewModel(workflow);
+        await viewModel.InitializeAsync();
+        Assert.False(viewModel.ClearUndoCommand.CanExecute(null));
+
+        await viewModel.ApplyNamedAsync(scene);
+        Assert.True(viewModel.ClearUndoCommand.CanExecute(null));
+        viewModel.ClearUndoCommand.Execute(null);
+        await WaitUntilAsync(() => !viewModel.ClearUndoCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void TrayStateUsesPauseResumeCheckedAndTextOnlyStatusCues()
     {
         var paused = new TrayHotkeyState(true, true, false, null);

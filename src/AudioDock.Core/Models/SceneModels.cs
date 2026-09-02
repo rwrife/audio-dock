@@ -64,6 +64,13 @@ public sealed record AudioScene
         ApplicationRules = (applicationRules ?? []).ToArray();
     }
 
+    [System.Text.Json.Serialization.JsonConstructor]
+    public AudioScene(int schemaVersion, Guid id, string name, IReadOnlyList<RoleTarget> roleTargets,
+        IReadOnlyList<EndpointRule> endpointRules, IReadOnlyList<ApplicationRule> applicationRules)
+        : this(schemaVersion, id, name, roleTargets.AsEnumerable(), endpointRules.AsEnumerable(), applicationRules.AsEnumerable())
+    {
+    }
+
     public int SchemaVersion { get; }
 
     public Guid Id { get; }
