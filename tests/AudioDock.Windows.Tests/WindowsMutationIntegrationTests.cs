@@ -14,10 +14,22 @@ public sealed class WindowsMutationIntegrationTests(ITestOutputHelper output)
         AudioSnapshot before = await adapter.CaptureAsync();
         EndpointDescriptor? endpoint = before.Endpoints.FirstOrDefault(candidate =>
             StringComparer.Ordinal.Equals(candidate.StableId, endpointId));
-        Assert.NotNull(endpoint);
-        Assert.Equal(EndpointState.Active, endpoint.State);
-        Assert.True(endpoint.Capabilities.CanSetVolume);
-        Assert.NotNull(endpoint.Volume);
+        if (endpoint is null)
+        {
+            output.WriteLine("Mutation was not attempted: the approved endpoint was not present.");
+            throw new InvalidOperationException(
+                "The explicitly approved endpoint was not found; no audio state was changed.");
+        }
+
+        if (endpoint.State != EndpointState.Active ||
+            !endpoint.Capabilities.CanSetVolume ||
+            endpoint.Volume is null)
+        {
+            output.WriteLine(
+                "Mutation was not attempted: the approved endpoint is not an active, volume-controllable endpoint.");
+            throw new InvalidOperationException(
+                "The explicitly approved endpoint is not safe to mutate; no audio state was changed.");
+        }
 
         VolumeLevel original = endpoint.Volume.Value;
         var testValue = new VolumeLevel(original.Value >= 0.95
@@ -35,7 +47,7 @@ public sealed class WindowsMutationIntegrationTests(ITestOutputHelper output)
                 StringComparer.Ordinal.Equals(candidate.StableId, endpoint.StableId))?.Volume;
             Assert.NotNull(actual);
             Assert.InRange(Math.Abs(actual.Value.Value - testValue.Value), 0, 0.005);
-            output.WriteLine("Mutation verified for the explicitly approved endpoint; no audio stream was opened.");
+            output.WriteLine("Mutation verified for the explicitly approved endpoint; the adapter opened no audio stream.");
         }
         catch (Exception exception)
         {
