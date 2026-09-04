@@ -8,10 +8,9 @@ No MSIX or conventional installer has been selected yet. Selecting one requires 
 
 ## Producing and validating a package
 
-Run the following commands from a clean checkout on Windows after the locked restore. The package script refuses to overwrite an existing output directory so stale files cannot become part of a candidate.
+Run the following commands from a clean checkout on Windows. The package script performs a locked runtime-specific restore before publishing. It refuses to overwrite an existing output directory so stale files cannot become part of a candidate.
 
 ```powershell
-dotnet restore AudioDock.sln --locked-mode
 .\scripts\package-win-x64.ps1
 .\scripts\test-package-win-x64.ps1
 ```
