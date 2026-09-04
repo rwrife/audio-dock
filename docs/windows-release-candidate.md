@@ -8,7 +8,7 @@ No MSIX or conventional installer has been selected yet. Selecting one requires 
 
 ## Producing and validating a package
 
-Run the following commands from a clean checkout on Windows. The package script performs a locked runtime-specific restore before publishing. It refuses to overwrite an existing output directory so stale files cannot become part of a candidate.
+Run the following commands from a clean checkout on Windows. CI first restores the solution in locked mode; the package script then re-evaluates only the `win-x64` runtime graph required for self-contained publishing. It refuses to overwrite an existing output directory so stale files cannot become part of a candidate.
 
 ```powershell
 .\scripts\package-win-x64.ps1

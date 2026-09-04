@@ -26,7 +26,7 @@ New-Item -ItemType Directory -Path $outputPath | Out-Null
 
 & dotnet restore (Join-Path $repositoryRoot "src/AudioDock.App/AudioDock.App.csproj") `
     --runtime win-x64 `
-    --locked-mode
+    --force-evaluate
 if ($LASTEXITCODE -ne 0) {
     throw "Runtime-specific dotnet restore failed with exit code $LASTEXITCODE."
 }
