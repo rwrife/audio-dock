@@ -40,3 +40,20 @@ jobs:
 
       - name: Report vulnerable transitive packages
         run: dotnet list AudioDock.sln package --vulnerable --include-transitive
+
+      - name: Package self-contained win-x64 ZIP
+        shell: pwsh
+        run: ./scripts/package-win-x64.ps1
+
+      - name: Validate package layout, checksums, and SBOM
+        shell: pwsh
+        run: ./scripts/test-package-win-x64.ps1
+
+      - name: Upload package candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-dock-win-x64
+          path: |
+            artifacts/AudioDock-win-x64-0.1.0-preview.zip
+            artifacts/AudioDock-win-x64-0.1.0-preview.zip.sha256
+          if-no-files-found: error

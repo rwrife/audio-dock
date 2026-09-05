@@ -81,7 +81,7 @@ All scene creation, preview, apply, undo, export, and settings actions must be k
 - `tests/AudioDock.Core.Tests` exercises matching, planning, bounds, stale/ambiguous targets, transactional writes, verification, cancellation, rollback/undo, and fake-adapter failures without touching host audio state.
 - `tests/AudioDock.Windows.Tests` exercises the Windows adapter through fake native backends and includes a separately gated mutation test that restores the selected host endpoint in `finally`.
 
-The supported target remains **Windows 10 version 22H2 and Windows 11**. See [the inventory compatibility note](docs/compatibility.md), [the safe Windows compatibility program](docs/windows-compatibility-program.md), [transactional apply evidence](docs/transactional-apply.md), and [accessibility implementation checklist](docs/accessibility-checklist.md). Current automated results establish compilation and managed fake/component behavior; they are not evidence of physical-device, driver, protected-session, installer, assistive-technology, or universal application compatibility.
+The supported target remains **Windows 10 version 22H2 and Windows 11**. See [the inventory compatibility note](docs/compatibility.md), [the safe Windows compatibility program](docs/windows-compatibility-program.md), [transactional apply evidence](docs/transactional-apply.md), [accessibility implementation checklist](docs/accessibility-checklist.md), and [Windows release-candidate packaging](docs/windows-release-candidate.md). Current automated results establish compilation and managed fake/component behavior; they are not evidence of physical-device, driver, protected-session, installer, assistive-technology, or universal application compatibility.
 
 ## Development quickstart
 
