@@ -4,7 +4,7 @@
 
 Audio Dock builds a self-contained `win-x64` ZIP before selecting an installer technology. The ZIP is intended for transparent testing from a clean Windows checkout; it contains the application, its .NET runtime, a CycloneDX 1.5 SBOM, and a SHA-256 manifest. A sibling `.zip.sha256` file hashes the archive itself. It does not install a driver, register a service, create a startup entry, or modify audio state during installation because it has no installation phase.
 
-No MSIX or conventional installer has been selected yet. Selecting one requires recorded physical-Windows evidence that the tray lifecycle, opt-in startup flow, update flow, and uninstall behavior work on supported Windows 10 22H2 and Windows 11 systems. Until that evidence exists, the ZIP is the only supported test-distribution format. It must not be described as a signed release or as evidence of universal device, driver, application, or accessibility compatibility.
+No MSIX or conventional installer has been selected yet. Selecting one requires recorded physical-Windows evidence that the tray lifecycle, opt-in startup flow, update flow, and uninstall behavior work on supported Windows 10 22H2 and Windows 11 systems. Use [the installer selection record](windows-installer-selection.md) and [release evidence template](windows-release-evidence-template.md) to capture and review that evidence. Until the evidence gate is complete, the ZIP is the only supported test-distribution format. It must not be described as a signed release or as evidence of universal device, driver, application, or accessibility compatibility.
 
 ## Producing and validating a package
 
@@ -44,4 +44,4 @@ Diagnostics remain local and bounded. Exported diagnostics, package-test output,
 
 The repository license is MIT. Package dependencies are centrally versioned in `Directory.Packages.props` and locked in each `packages.lock.json`; the CI restore uses `--locked-mode`. The Windows Core Audio boundary uses direct Windows SDK/Win32 interop, whose platform terms remain separate from this repository's license.
 
-No candidate is code signed. A signed claim requires a certificate-backed signing command, timestamping, verification of the resulting signature, and captured output from that run. No release archive, changelog entry, or production release should be created until the ZIP workflow, physical tray/startup/uninstall evidence, required accessibility evidence, and any selected installer checks have real passing output.
+No candidate is code signed. A signed claim requires a certificate-backed signing command, timestamping, verification of the resulting signature, and captured output from that run. No release archive, changelog entry, or production release should be created until the ZIP workflow, the installer-selection evidence gate, physical tray/startup/uninstall evidence, required accessibility evidence, and any selected installer checks have real passing output.
