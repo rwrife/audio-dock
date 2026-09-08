@@ -22,6 +22,7 @@ dotnet build AudioDock.sln --configuration Release --no-restore
 dotnet test AudioDock.sln --configuration Release --no-build --logger "console;verbosity=normal"
 .\scripts\package-win-x64.ps1
 .\scripts\test-package-win-x64.ps1
+.\scripts\smoke-launch-win-x64.ps1
 ```
 
 Record each command's exit code and any relevant output snippets.
@@ -38,6 +39,7 @@ Record each command's exit code and any relevant output snippets.
 | Scenario | Pass/Fail | Evidence reference |
 |---|---|---|
 | Tray appears after launch |  |  |
+| Packaged tray app smoke-launches on `windows-latest` CI |  |  |
 | Startup is off by default |  |  |
 | Startup opt-in is explicit and reversible |  |  |
 | Upgrade preserves scenes/settings |  |  |

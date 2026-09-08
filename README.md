@@ -2,7 +2,7 @@
 
 **Audio Dock is a local-first Windows tray utility for people who switch between speakers, headsets, docks, and calls to save, preview, and safely apply named audio-device and per-app volume scenes.**
 
-> **Status:** the .NET 8 foundation, transactional Core Audio boundary, crash-safe versioned local persistence, validated import/export and backup/restore, bounded redacted diagnostics, accessible editor/review/data-control workflow, tray menu, and opt-in configurable hotkeys are implemented. Packaging and physical-Windows compatibility/accessibility validation are not complete yet.
+> **Status:** the .NET 8 foundation, transactional Core Audio boundary, crash-safe versioned local persistence, validated import/export and backup/restore, bounded redacted diagnostics, accessible editor/review/data-control workflow, tray menu, and opt-in configurable hotkeys are implemented. ZIP packaging with checksum/SBOM validation and a CI smoke launch is implemented; installer selection plus physical-Windows compatibility/accessibility validation are not complete yet.
 
 ## Motivation
 
