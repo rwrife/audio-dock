@@ -13,6 +13,7 @@ Run the following commands from a clean checkout on Windows. CI first restores t
 ```powershell
 .\scripts\package-win-x64.ps1
 .\scripts\test-package-win-x64.ps1
+.\scripts\smoke-launch-win-x64.ps1
 ```
 
 The output is `artifacts/AudioDock-win-x64-0.1.0-preview.zip`. Its corresponding directory contains:
@@ -30,7 +31,7 @@ Expand-Archive .\AudioDock-win-x64-0.1.0-preview.zip -DestinationPath .\AudioDoc
 Get-Content .\AudioDock-test\AudioDock-win-x64-0.1.0-preview\SHA256SUMS.txt
 ```
 
-GitHub Actions performs a clean locked restore, builds and tests Release, produces this ZIP, validates its layout/checksums/SBOM, and uploads the package as a workflow artifact. Package validation checks files and archive structure only; it does not claim a headless runner exercised the interactive tray UI.
+GitHub Actions performs a clean locked restore, builds and tests Release, produces this ZIP, validates its layout/checksums/SBOM, smoke-launches the packaged tray executable, and uploads the package as a workflow artifact. CI smoke launch proves only that the packaged binary starts on `windows-latest` and can be terminated without a startup crash; it does not claim full tray interaction coverage, assistive-technology validation, or universal device/driver/application compatibility.
 
 ## Startup, upgrade, and removal
 
