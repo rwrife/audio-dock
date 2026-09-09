@@ -7,4 +7,5 @@ public static class WindowsAdapterBoundary
 {
     public const bool NativeInventoryImplemented = true;
     public const bool CapabilityProbedMutationImplemented = true;
+    public const bool StartupRegistrationImplemented = true;
 }

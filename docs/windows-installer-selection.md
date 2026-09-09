@@ -20,9 +20,9 @@ All rows must be captured on **Windows 10 22H2** and **Windows 11** using real m
 | Scenario | Required outcome |
 |---|---|
 | First launch and tray visibility | App starts, tray icon appears, main window and activity/status surfaces remain available |
-| Startup registration (opt-in only) | Startup remains off by default; enabling is explicit/visible; disabling is explicit/visible and reversible |
-| Upgrade over existing install | Existing scenes/settings remain intact; app binary updates; no surprise startup toggle changes |
-| Uninstall default path | Installer artifacts removed; startup entry removed if created by installer; `%LOCALAPPDATA%\\AudioDock` retained by default |
+| Startup registration (opt-in only) | Startup remains off by default; enabling from Settings is explicit/visible and verified by read-back; disabling is explicit/visible and reversible; the app reconciles external changes honestly at next launch |
+| Upgrade over existing install | Existing scenes/settings remain intact; app binary updates; no surprise startup toggle changes; the startup entry continues to launch the upgraded binary at the same location |
+| Uninstall default path | Installer artifacts removed; startup entry handled per the ownership rule below; `%LOCALAPPDATA%\\AudioDock` retained by default |
 | Optional uninstall data deletion | Data deletion happens only when explicitly selected by the user |
 | Accessibility smoke | Keyboard reachability, visible focus, non-color-only status cues, and 200% scaling pass for install/startup/uninstall-related UI |
 
@@ -34,6 +34,15 @@ Use `docs/windows-release-evidence-template.md` and attach:
 2. Command output and exit codes.
 3. Redacted screenshots/log snippets proving startup toggle and uninstall behavior.
 4. Explicit pass/fail per scenario above.
+
+## Startup-entry ownership rule
+
+The in-app Settings toggle owns one per-user startup entry pointing at the current
+executable location. Whichever installer is selected must satisfy this rule:
+
+- An upgrade that keeps the executable at the same path must leave the entry working (no toggle surprise, no duplicate entries).
+- An upgrade that relocates the executable must redirect or re-create the entry so the startup toggle keeps controlling exactly one entry, or the app must honestly detect and report the stale entry.
+- Uninstall must not silently leave a startup entry pointing at a deleted binary. The candidate must demonstrate either removing/redirecting the app-owned entry or the app detecting and repairing it on next run, and must show `%LOCALAPPDATA%\AudioDock` retained unless the user explicitly selects deletion.
 
 ## Decision gate
 

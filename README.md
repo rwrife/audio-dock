@@ -2,7 +2,7 @@
 
 **Audio Dock is a local-first Windows tray utility for people who switch between speakers, headsets, docks, and calls to save, preview, and safely apply named audio-device and per-app volume scenes.**
 
-> **Status:** the .NET 8 foundation, transactional Core Audio boundary, crash-safe versioned local persistence, validated import/export and backup/restore, bounded redacted diagnostics, accessible editor/review/data-control workflow, tray menu, and opt-in configurable hotkeys are implemented. ZIP packaging with checksum/SBOM validation and a CI smoke launch is implemented; installer selection plus physical-Windows compatibility/accessibility validation are not complete yet.
+> **Status:** the .NET 8 foundation, transactional Core Audio boundary, crash-safe versioned local persistence, validated import/export and backup/restore, bounded redacted diagnostics, accessible editor/review/data-control workflow, tray menu, opt-in configurable hotkeys, and an opt-in reversible sign-in startup toggle with read-back verification are implemented. ZIP packaging with checksum/SBOM validation and a CI smoke launch is implemented; installer selection plus physical-Windows compatibility/accessibility validation are not complete yet.
 
 ## Motivation
 
@@ -52,7 +52,7 @@ Windows remembers some audio choices, but a dock, Bluetooth headset, game, meeti
 
 ## Privacy, permissions, and storage
 
-Audio Dock operates locally and never reads audio samples. It stores scene names, endpoint identifiers and friendly names, executable identity rules, requested volume/mute values, preferences, and bounded diagnostics under `%LOCALAPPDATA%\AudioDock`. It does not require microphone content access, network access, an account, or administrator rights for normal operation. A global-hotkey permission is not separately requested on Windows; any later startup registration is opt-in and reversible.
+Audio Dock operates locally and never reads audio samples. It stores scene names, endpoint identifiers and friendly names, executable identity rules, requested volume/mute values, preferences, and bounded diagnostics under `%LOCALAPPDATA%\AudioDock`. It does not require microphone content access, network access, an account, or administrator rights for normal operation. A global-hotkey permission is not separately requested on Windows. Sign-in startup is opt-in and reversible: the Settings page can add or remove exactly one per-user startup entry (the current user's standard Run entry, visible and manageable in Windows startup settings), the choice is off by default, the app reads back the entry after every change and reports what it observed, and removing it never touches user data.
 
 Executable paths can reveal user information, so the UI makes path-based matching optional and export can redact paths in favor of publisher/product metadata. Diagnostics are local, bounded, inspectable, and clearable. Imports are validated before they can change system state. Applying a scene is always a user-visible action in the MVP.
 
@@ -75,11 +75,11 @@ All scene creation, preview, apply, undo, export, and settings actions must be k
 ## Project layout
 
 - `src/AudioDock.Core` contains platform- and UI-independent scene, descriptor, capability, match, plan, transactional execution, apply-result, and bounded undo contracts.
-- `src/AudioDock.Windows` contains the narrow, disposable Core Audio COM boundary. It inventories metadata and performs only capability-probed role, volume, and mute writes; managed descriptors, commands, results, and diagnostics are the only values crossing into Core/UI.
+- `src/AudioDock.Windows` contains the narrow, disposable Core Audio COM boundary. It inventories metadata and performs only capability-probed role, volume, and mute writes; managed descriptors, commands, results, and diagnostics are the only values crossing into Core/UI. It also hosts the per-user sign-in startup registration adapter, which writes one visible HKCU Run entry only after an explicit user opt-in and always verifies by read-back.
 - `src/AudioDock.Diagnostics` is an opt-in, stdout-only inventory command; executable paths require an explicit flag.
-- `src/AudioDock.App` is the WPF/MVVM host for scene CRUD, capture/manual editing, match/capability review, before/after preview, apply/cancel/undo, durable activity, tray actions, and opt-in conflict-detected global hotkeys. Its view model depends on the Core workflow interface, not COM.
+- `src/AudioDock.App` is the WPF/MVVM host for scene CRUD, capture/manual editing, match/capability review, before/after preview, apply/cancel/undo, durable activity, tray actions, opt-in conflict-detected global hotkeys, and the opt-in reversible sign-in startup toggle. Its view model depends on the Core workflow interface, not COM.
 - `tests/AudioDock.Core.Tests` exercises matching, planning, bounds, stale/ambiguous targets, transactional writes, verification, cancellation, rollback/undo, and fake-adapter failures without touching host audio state.
-- `tests/AudioDock.Windows.Tests` exercises the Windows adapter through fake native backends and includes a separately gated mutation test that restores the selected host endpoint in `finally`.
+- `tests/AudioDock.Windows.Tests` exercises the Windows adapter through fake native backends, includes a separately gated mutation test that restores the selected host endpoint in `finally`, and includes a separately gated startup-registration test that round-trips the real registry backend against a throwaway HKCU probe key it deletes in `finally`.
 
 The supported target remains **Windows 10 version 22H2 and Windows 11**. See [the inventory compatibility note](docs/compatibility.md), [the safe Windows compatibility program](docs/windows-compatibility-program.md), [transactional apply evidence](docs/transactional-apply.md), [accessibility implementation checklist](docs/accessibility-checklist.md), [Windows release-candidate packaging](docs/windows-release-candidate.md), [installer selection record](docs/windows-installer-selection.md), and [release evidence template](docs/windows-release-evidence-template.md). Current automated results establish compilation and managed fake/component behavior; they are not evidence of physical-device, driver, protected-session, installer, assistive-technology, or universal application compatibility.
 

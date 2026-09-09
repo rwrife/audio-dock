@@ -131,6 +131,26 @@ public sealed class LocalDataServicesTests : IDisposable
     }
 
     [Fact]
+    public async Task StartupPreferenceRoundTripsAndDefaultsOffWhenAbsent()
+    {
+        Directory.CreateDirectory(directory);
+        string path = AudioDockDataPaths.Settings(directory);
+        var store = new JsonSettingsStore(path);
+
+        Assert.False((await store.LoadAsync()).StartupEnabled);
+
+        await store.SaveAsync(AppSettings.Defaults with { StartupEnabled = true });
+        Assert.True((await store.LoadAsync()).StartupEnabled);
+
+        // A v1 document written before the startup field existed must load as opt-out.
+        await File.WriteAllTextAsync(path,
+            "{\"schemaVersion\":1,\"hotkeyEnabled\":false,\"hotkeyModifierChoice\":0,\"hotkeyKey\":\"D\"}");
+        AppSettings withoutField = await store.LoadAsync();
+        Assert.False(withoutField.StartupEnabled);
+        Assert.False(withoutField.HotkeyEnabled);
+    }
+
+    [Fact]
     public async Task TransferAndMaintenanceWritePrivacySafeProductionDiagnostics()
     {
         Directory.CreateDirectory(directory);

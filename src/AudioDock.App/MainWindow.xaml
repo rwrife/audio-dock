@@ -107,6 +107,10 @@
           <WrapPanel><TextBlock VerticalAlignment="Center" Text="Modifiers"/><ComboBox x:Name="HotkeyModifiers" Width="160" SelectionChanged="HotkeySettingChanged"><ComboBoxItem Content="Control+Alt" IsSelected="True"/><ComboBoxItem Content="Control+Shift"/><ComboBoxItem Content="Alt+Shift"/></ComboBox><TextBlock VerticalAlignment="Center" Text="Key"/><TextBox x:Name="HotkeyKey" Width="80" MaxLength="1" Text="D" TextChanged="HotkeySettingChanged" AutomationProperties.Name="Global hotkey letter"/></WrapPanel>
           <Button HorizontalAlignment="Left" Content="Disable hotkeys now" Click="DisableHotkeysClick" />
           <TextBlock x:Name="HotkeyStatus" Text="Hotkeys disabled." AutomationProperties.LiveSetting="Polite" />
+          <Separator Margin="3,16"/><TextBlock FontSize="20" FontWeight="SemiBold" Text="Sign-in startup" />
+          <TextBlock TextWrapping="Wrap" Text="Startup is off by default and is never created automatically. Enabling adds one visible per-user entry that Windows shows and manages in its startup settings; disabling removes exactly that entry. User data is unaffected by either action." />
+          <CheckBox x:Name="StartupEnabled" Content="_Start Audio Dock when I sign in (opt in)" Checked="StartupSettingChanged" Unchecked="StartupSettingChanged" AutomationProperties.Name="Start Audio Dock when I sign in; opt in and reversible" />
+          <TextBlock x:Name="StartupStatus" Text="Startup state not yet checked." AutomationProperties.LiveSetting="Polite" />
           <Separator Margin="3,16"/><TextBlock FontSize="20" FontWeight="SemiBold" Text="Local data and privacy" />
           <TextBlock x:Name="DataLocationText" TextWrapping="Wrap" AutomationProperties.Name="Audio Dock local data folder" />
           <CheckBox x:Name="AllowExecutablePaths" Content="Allow optional executable-path matching (may disclose user or install details)" Checked="HotkeySettingChanged" Unchecked="HotkeySettingChanged" />

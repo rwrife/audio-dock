@@ -61,6 +61,20 @@ Remove-Item Env:AUDIO_DOCK_MUTATION_TEST, Env:AUDIO_DOCK_MUTATION_ENDPOINT_ID
 
 - Mutation test executed: yes/no
 - Restore verification outcome:
+
+## Startup registration round trip (optional, registry-only, never audio)
+
+Writes only under a throwaway HKCU probe key; the key is deleted in `finally`. It never
+touches the production Audio Dock startup entry or the Run key.
+
+```powershell
+$env:AUDIO_DOCK_STARTUP_TEST = "1"
+dotnet test tests/AudioDock.Windows.Tests/AudioDock.Windows.Tests.csproj --configuration Release --no-restore --filter FullyQualifiedName~WindowsStartupRegistrationIntegrationTests --logger "console;verbosity=normal"
+Remove-Item Env:AUDIO_DOCK_STARTUP_TEST
+```
+
+- Startup round-trip test executed: yes/no
+- Probe-key cleanup (restoration) outcome:
 - Notes:
 
 ## Packaging and supply-chain evidence
