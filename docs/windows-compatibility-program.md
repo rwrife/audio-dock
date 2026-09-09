@@ -18,6 +18,7 @@ Do not run a mutation test during a call, recording, presentation, or other sens
 | Exclusive/sandboxed/unavailable sessions | Missing, inaccessible, or unavailable session | Simulated tests | Not yet captured | No universal-control claim; affected rules are skipped or deferred. |
 | Verification mismatch | Write result differs from fresh observation | Core fake-adapter test | Not yet captured | Transaction stops and attempts rollback. |
 | Host mutation/restoration | One approved endpoint volume change | Opt-in Windows-only test | Not yet captured | Only a passing run on that endpoint/build is evidence. |
+| Sign-in startup registration | Write/read-back/remove of the per-user startup entry | Coordinator logic: fake-backend tests (any OS). Real backend round trip: opt-in Windows-only probe test against a throwaway registry location | Not yet captured; startup UI visibility and uninstall ownership still need physical evidence | Registration is opt-in, verified by read-back, and reported honestly when unverifiable. |
 
 Evidence labels are deliberately narrow: `simulated` means a fake backend; GitHub Actions on `windows-latest` is CI evidence, not physical-device evidence; `physical` means a manually recorded supported Windows run. Linux has no Windows evidence.
 
@@ -35,6 +36,13 @@ $env:AUDIO_DOCK_MUTATION_TEST = "1"
 $env:AUDIO_DOCK_MUTATION_ENDPOINT_ID = "<operator-approved endpoint ID>"
 dotnet test tests/AudioDock.Windows.Tests/AudioDock.Windows.Tests.csproj --configuration Release --no-restore --filter FullyQualifiedName~WindowsMutationIntegrationTests --logger "console;verbosity=normal"
 Remove-Item Env:AUDIO_DOCK_MUTATION_TEST, Env:AUDIO_DOCK_MUTATION_ENDPOINT_ID
+
+# Optional and state-changing (registry only, never audio): opt-in startup registration
+# round trip. It writes only under a throwaway HKCU probe key and deletes that key in
+# `finally`; it never touches the production Audio Dock startup entry or the Run key.
+$env:AUDIO_DOCK_STARTUP_TEST = "1"
+dotnet test tests/AudioDock.Windows.Tests/AudioDock.Windows.Tests.csproj --configuration Release --no-restore --filter FullyQualifiedName~WindowsStartupRegistrationIntegrationTests --logger "console;verbosity=normal"
+Remove-Item Env:AUDIO_DOCK_STARTUP_TEST
 ```
 
 Record Windows edition/build, endpoint transport/driver, session/application mode, command exit code, and the harness lines for both mutation and restoration. Do not publish raw inventory output. At the time this document was added, no physical-machine run has been captured; automated results are recorded by CI and pull-request checks only.

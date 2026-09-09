@@ -14,10 +14,10 @@ public static class AudioDockDataPaths
 }
 
 public sealed record AppSettings(int SchemaVersion, bool HotkeyEnabled, int HotkeyModifierChoice, string HotkeyKey,
-    bool AllowExecutablePathMatching = false)
+    bool AllowExecutablePathMatching = false, bool StartupEnabled = false)
 {
     public const int CurrentSchemaVersion = 1;
-    public static AppSettings Defaults => new(CurrentSchemaVersion, false, 0, "D", false);
+    public static AppSettings Defaults => new(CurrentSchemaVersion, false, 0, "D", false, false);
 }
 
 public sealed class JsonSettingsStore(string path)
@@ -45,7 +45,7 @@ public sealed class JsonSettingsStore(string path)
             {
                 LegacyHotkeyPreferences legacy = document.RootElement.Deserialize<LegacyHotkeyPreferences>(JsonFile.Options)
                     ?? throw new InvalidDataException("Legacy settings are empty.");
-                value = new(AppSettings.CurrentSchemaVersion, legacy.Enabled, legacy.ModifierChoice, legacy.Key, false);
+                value = new(AppSettings.CurrentSchemaVersion, legacy.Enabled, legacy.ModifierChoice, legacy.Key, false, false);
                 ValidateHotkey(value);
                 await SaveAsync(value, cancellationToken).ConfigureAwait(false);
                 return value;
@@ -70,7 +70,7 @@ public sealed class JsonSettingsStore(string path)
         try
         {
             LegacyHotkeyPreferences legacy = root.Deserialize<LegacyHotkeyPreferences>(JsonFile.Options)!;
-            ValidateHotkey(new(AppSettings.CurrentSchemaVersion, legacy.Enabled, legacy.ModifierChoice, legacy.Key, false));
+            ValidateHotkey(new(AppSettings.CurrentSchemaVersion, legacy.Enabled, legacy.ModifierChoice, legacy.Key, false, false));
             return true;
         }
         catch (Exception exception) when (exception is JsonException or InvalidDataException or NullReferenceException) { return false; }

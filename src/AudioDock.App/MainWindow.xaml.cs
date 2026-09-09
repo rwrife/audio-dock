@@ -28,11 +28,13 @@ public partial class MainWindow : Window, IDisposable
     private readonly SceneTransferService transfers;
     private readonly LocalDataMaintenance maintenance;
     private readonly LocalDiagnosticStore diagnostics;
+    private readonly StartupRegistrationCoordinator startup;
     private HwndSource? source;
     private bool hotkeyRegistered;
     private bool hotkeysPaused;
     private string? hotkeyProblem;
     private bool loadingSettings = true;
+    private bool updatingStartup;
     private bool disposed;
     private bool closePending;
     private bool closeReady;
@@ -40,6 +42,7 @@ public partial class MainWindow : Window, IDisposable
 
     public MainWindow()
     {
+        startup = new(new RegistryStartupBackend());
         InitializeComponent();
         dataRoot = AudioDockDataPaths.DefaultRoot;
         settingsStore = new(AudioDockDataPaths.Settings(dataRoot));
@@ -181,6 +184,68 @@ public partial class MainWindow : Window, IDisposable
         HotkeyStatus.Text = "Hotkeys disabled. This can be re-enabled at any time.";
     }
 
+    private void StartupSettingChanged(object sender, RoutedEventArgs e)
+    {
+        if (updatingStartup) return;
+        ApplyStartupPreference(StartupEnabled.IsChecked == true);
+    }
+
+    private void ApplyStartupPreference(bool desiredEnabled)
+    {
+        try
+        {
+            StartupRegistrationResult result = desiredEnabled
+                ? startup.EnsureEnabled(BuildStartupCommand())
+                : startup.EnsureDisabled();
+            if (!result.Verified)
+            {
+                RestoreObservedStartupState(result.Observed);
+                StartupStatus.Text = $"Startup unchanged: {result.Detail}";
+                return;
+            }
+
+            StartupStatus.Text = desiredEnabled
+                ? "Startup registered and verified. Windows shows this entry in its startup settings; disabling here removes it."
+                : "Startup entry removed and verified. No audio data was changed.";
+            SaveSettings();
+        }
+        catch (Exception exception)
+        {
+            RestoreObservedStartupState(ObserveStartupSafely());
+            StartupStatus.Text = $"Startup unchanged after error: {exception.Message}";
+        }
+    }
+
+    private static string BuildStartupCommand()
+    {
+        string executable = Environment.ProcessPath
+            ?? throw new InvalidOperationException("The running executable path is unavailable; startup was not changed.");
+        return $"\"{executable}\"";
+    }
+
+    private void RestoreObservedStartupState(StartupRegistrationState? observed)
+    {
+        updatingStartup = true;
+        try
+        {
+            StartupEnabled.IsChecked = observed?.Observation == StartupRegistrationObservation.Registered;
+        }
+        finally
+        {
+            updatingStartup = false;
+        }
+    }
+
+    private StartupRegistrationState? ObserveStartupSafely()
+    {
+        try { return startup.Observe(); }
+        catch (Exception exception)
+        {
+            StartupStatus.Text = $"Startup state could not be read: {exception.Message}";
+            return null;
+        }
+    }
+
     private void ToggleHotkeyPause()
     {
         hotkeysPaused = !hotkeysPaused;
@@ -258,11 +323,56 @@ public partial class MainWindow : Window, IDisposable
             HotkeyModifiers.SelectedIndex = settings.HotkeyModifierChoice;
             HotkeyKey.Text = settings.HotkeyKey;
             AllowExecutablePaths.IsChecked = settings.AllowExecutablePathMatching;
+            ReconcileStartupState(settings.StartupEnabled);
         }
         catch (Exception exception)
         {
             HotkeyStatus.Text = $"Settings could not be loaded: {exception.Message}";
+            ReconcileStartupStateAfterLoadFailure();
         }
+    }
+
+    private void ReconcileStartupStateAfterLoadFailure()
+    {
+        StartupRegistrationState? observed = ObserveStartupSafely();
+        if (observed is null) return;
+        SetStartupCheckbox(observed.Observation == StartupRegistrationObservation.Registered);
+        StartupStatus.Text = observed.Observation == StartupRegistrationObservation.Registered
+            ? "Settings could not be loaded, but a startup entry was detected; the checkbox reflects the observed state."
+            : "Settings could not be loaded; no startup entry was detected.";
+    }
+
+    private void SetStartupCheckbox(bool isChecked)
+    {
+        updatingStartup = true;
+        try
+        {
+            StartupEnabled.IsChecked = isChecked;
+        }
+        finally
+        {
+            updatingStartup = false;
+        }
+    }
+
+    private void ReconcileStartupState(bool settingsClaimEnabled)
+    {
+        StartupRegistrationState? observed = ObserveStartupSafely();
+        bool actuallyRegistered = observed?.Observation == StartupRegistrationObservation.Registered;
+        SetStartupCheckbox(actuallyRegistered);
+
+        if (observed is null)
+        {
+            return; // ObserveStartupSafely already reported the read failure.
+        }
+
+        StartupStatus.Text = (settingsClaimEnabled, actuallyRegistered) switch
+        {
+            (true, true) => "Startup entry detected and matches the saved preference.",
+            (true, false) => "Saved preference expects startup, but no entry was detected on this machine; it may have been removed externally. Toggle to re-register.",
+            (false, true) => "A startup entry was detected although the saved preference is off; it may have been added externally. The checkbox reflects the observed state.",
+            _ => "Startup is off; no entry was detected.",
+        };
     }
 
     private async void SaveSettings()
@@ -271,7 +381,7 @@ public partial class MainWindow : Window, IDisposable
         {
             await settingsStore.SaveAsync(new(AppSettings.CurrentSchemaVersion,
                 HotkeyEnabled.IsChecked == true, HotkeyModifiers.SelectedIndex, HotkeyKey.Text.Trim().ToUpperInvariant(),
-                AllowExecutablePaths.IsChecked == true));
+                AllowExecutablePaths.IsChecked == true, StartupEnabled.IsChecked == true));
         }
         catch (Exception exception)
         {
