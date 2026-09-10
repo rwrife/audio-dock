@@ -46,3 +46,5 @@ Remove-Item Env:AUDIO_DOCK_STARTUP_TEST
 ```
 
 Record Windows edition/build, endpoint transport/driver, session/application mode, command exit code, and the harness lines for both mutation and restoration. Do not publish raw inventory output. At the time this document was added, no physical-machine run has been captured; automated results are recorded by CI and pull-request checks only.
+
+To reduce capture friction, `.\scripts\collect-evidence.ps1` automates the baseline command sequence (including the optional startup probe via `-IncludeStartupProbe`), redacts personal paths, verifies the ZIP checksum, and writes a structured bundle under the git-ignored `evidence/` directory. It changes no audio state and no startup settings. Its self-check fails the run if any captured file still contains the operator's user profile path, user name, domain, or computer name. Collector output remains automated host/CI-level evidence; the physical-evidence rows in the matrix above still require a manual run. The collector's own logic is covered by `tests/powershell/test-collect-evidence.ps1`, which CI executes on every pull request.
