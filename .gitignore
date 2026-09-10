@@ -29,6 +29,9 @@ packages/
 *.db-shm
 *.db-wal
 
+# Captured release evidence (may reference host state; shared manually after review)
+evidence/
+
 # OS
 Thumbs.db
 Desktop.ini

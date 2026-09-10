@@ -53,6 +53,10 @@ jobs:
         shell: pwsh
         run: ./scripts/smoke-launch-win-x64.ps1
 
+      - name: Test evidence collector script
+        shell: pwsh
+        run: ./tests/powershell/test-collect-evidence.ps1
+
       - name: Upload package candidate
         uses: actions/upload-artifact@v4
         with:

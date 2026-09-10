@@ -15,6 +15,19 @@ Use this template to capture reproducible release-candidate evidence without ove
 
 ## Baseline commands
 
+Use the automated collector to run the baseline and capture a redacted bundle:
+
+```powershell
+.\scripts\collect-evidence.ps1                 # optional: -IncludeStartupProbe for the registry-only round trip
+```
+
+It runs exactly the commands below, records per-command exit codes and redacted output tails under
+`evidence/run-<timestamp>/`, verifies the ZIP checksum, and writes `evidence-bundle.md`. It changes no
+audio state and touches no startup settings. Its results are host/CI-level evidence only; the manual
+scenario table below still requires a human on physical hardware.
+
+Equivalent manual commands (the collector wraps these):
+
 ```powershell
 dotnet restore AudioDock.sln --locked-mode
 dotnet format AudioDock.sln --verify-no-changes --no-restore

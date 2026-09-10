@@ -31,7 +31,9 @@ Expand-Archive .\AudioDock-win-x64-0.1.0-preview.zip -DestinationPath .\AudioDoc
 Get-Content .\AudioDock-test\AudioDock-win-x64-0.1.0-preview\SHA256SUMS.txt
 ```
 
-GitHub Actions performs a clean locked restore, builds and tests Release, produces this ZIP, validates its layout/checksums/SBOM, smoke-launches the packaged tray executable, and uploads the package as a workflow artifact. CI smoke launch proves only that the packaged binary starts on `windows-latest` and can be terminated without a startup crash; it does not claim full tray interaction coverage, assistive-technology validation, or universal device/driver/application compatibility.
+GitHub Actions performs a clean locked restore, builds and tests Release, produces this ZIP, validates its layout/checksums/SBOM, smoke-launches the packaged tray executable, runs the evidence-collector self-tests, and uploads the package as a workflow artifact. CI smoke launch proves only that the packaged binary starts on `windows-latest` and can be terminated without a startup crash; it does not claim full tray interaction coverage, assistive-technology validation, or universal device/driver/application compatibility.
+
+To prepare evidence for the installer-selection gate, run `.\scripts\collect-evidence.ps1` from a clean checkout. It executes the baseline commands above, records exit codes and redacted output tails plus run metadata into the git-ignored `evidence/` directory, verifies the ZIP checksum, and fails its own redaction self-check if any captured file still contains operator-identifying values. It never mutates audio state or startup settings, and its output is explicitly labeled host/CI-level evidence — the manual scenario table in `docs/windows-release-evidence-template.md` still has to be completed by a human on supported physical hardware.
 
 ## Startup, upgrade, and removal
 

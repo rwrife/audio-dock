@@ -31,7 +31,7 @@ All rows must be captured on **Windows 10 22H2** and **Windows 11** using real m
 Use `docs/windows-release-evidence-template.md` and attach:
 
 1. OS build and installer candidate metadata.
-2. Command output and exit codes.
+2. Command output and exit codes. The `.\scripts\collect-evidence.ps1` collector automates this part: it runs the baseline commands, verifies the ZIP checksum, redacts personal paths, and writes a structured bundle under `evidence/` (git-ignored). It only automates capture; automated output is host/CI-level evidence and cannot satisfy the physical rows above.
 3. Redacted screenshots/log snippets proving startup toggle and uninstall behavior.
 4. Explicit pass/fail per scenario above.
 
