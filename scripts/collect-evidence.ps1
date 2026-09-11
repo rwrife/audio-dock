@@ -93,6 +93,22 @@ function Test-ArchiveChecksum {
     [pscustomobject]$result
 }
 
+function Get-RequiredManualScenario {
+    # Canonical list of manual scenario rows. scripts/finalize-evidence.ps1
+    # re-uses this exact list to validate operator-completed bundles, so the
+    # two tools can never drift on what the physical-evidence gate requires.
+    @(
+        'Tray appears after launch'
+        'Startup is off by default'
+        'Startup opt-in is explicit and reversible (visible in Windows startup settings)'
+        'Upgrade preserves scenes/settings'
+        'Uninstall (or ZIP-removal procedure) handles the startup entry per ownership rule'
+        'Uninstall retains %LOCALAPPDATA%\AudioDock by default'
+        'Optional data deletion requires explicit user choice'
+        'Accessibility smoke (keyboard/focus/high contrast/200% scaling/non-color cues)'
+    )
+}
+
 function Get-BaselineCommands {
     param([switch]$IncludeStartupProbe)
     $available = { $null -ne (Get-Command dotnet -ErrorAction SilentlyContinue) }
@@ -255,16 +271,7 @@ function Run-EvidenceCollector {
     } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $metadataPath -Encoding utf8NoBOM
 
     $rows = @($results | ForEach-Object { "| $($_.Name) | $($_.Status) | $($_.ExitCode) | $($_.OutputLines) |" })
-    $manualRows = @(
-        '| Tray appears after launch |  |  |',
-        '| Startup is off by default |  |  |',
-        '| Startup opt-in is explicit and reversible (visible in Windows startup settings) |  |  |',
-        '| Upgrade preserves scenes/settings |  |  |',
-        '| Uninstall (or ZIP-removal procedure) handles the startup entry per ownership rule |  |  |',
-        '| Uninstall retains %LOCALAPPDATA%\AudioDock by default |  |  |',
-        '| Optional data deletion requires explicit user choice |  |  |',
-        '| Accessibility smoke (keyboard/focus/high contrast/200% scaling/non-color cues) |  |  |'
-    )
+    $manualRows = @(Get-RequiredManualScenario | ForEach-Object { "| $_ |  |  |" })
     $bundleLines = @(
         '# Audio Dock release evidence bundle (auto-generated)'
         ''
