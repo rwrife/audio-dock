@@ -40,6 +40,29 @@ dotnet test AudioDock.sln --configuration Release --no-build --logger "console;v
 
 Record each command's exit code and any relevant output snippets.
 
+## Gate validation
+
+After filling in the manual scenario table and honesty notes below, validate the
+completed bundle with:
+
+```powershell
+.\scripts\finalize-evidence.ps1                    # validates the most recent evidence\run-* directory
+.\scripts\finalize-evidence.ps1 -RunDirectory .\evidence\run-<timestamp>
+```
+
+It checks that every required manual scenario row is present with an explicit
+pass/fail verdict and a non-empty evidence reference, that the honesty notes are
+filled in, and that `run-metadata.json` shows a matching ZIP checksum with no
+failed or errored automated commands. Exit code 0 means the bundle is complete
+and internally consistent; 1 lists every blocker to fix; 2 means the bundle
+could not be found or parsed.
+
+The validator checks bookkeeping only. It does not and cannot independently
+observe physical Windows behavior, and a complete bundle still requires human
+review — installer selection and certificate-backed signing have separate gates.
+Its own logic is covered by `tests/powershell/test-finalize-evidence.ps1`, which
+CI executes on every pull request.
+
 ## Installer candidate under test
 
 - Candidate type: MSIX / conventional installer (specify tool)
