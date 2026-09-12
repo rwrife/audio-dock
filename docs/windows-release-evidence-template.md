@@ -61,7 +61,10 @@ The validator checks bookkeeping only. It does not and cannot independently
 observe physical Windows behavior, and a complete bundle still requires human
 review — installer selection and certificate-backed signing have separate gates.
 Its own logic is covered by `tests/powershell/test-finalize-evidence.ps1`, which
-CI executes on every pull request.
+CI executes on every pull request. The scenario and honesty labels in this
+template are pinned to the validator's canonical list by
+`tests/powershell/test-evidence-template-sync.ps1`, also run by CI on every
+pull request; keep them matching if either side changes.
 
 ## Installer candidate under test
 
@@ -72,15 +75,21 @@ CI executes on every pull request.
 
 ## Required scenario evidence
 
+Row labels below mirror `Get-RequiredManualScenario` in `scripts/collect-evidence.ps1`
+verbatim — that list is the single source of truth `scripts/finalize-evidence.ps1`
+validates against. `tests/powershell/test-evidence-template-sync.ps1` (run by CI on
+every pull request) fails if the two ever drift, so copy these labels into a
+collected bundle unchanged. Smoke-launch of the packaged app is automated
+host/CI-level evidence recorded by the collector, not a manual scenario row.
+
 | Scenario | Pass/Fail | Evidence reference |
 |---|---|---|
 | Tray appears after launch |  |  |
-| Packaged tray app smoke-launches on `windows-latest` CI |  |  |
 | Startup is off by default |  |  |
-| Startup opt-in is explicit and reversible |  |  |
+| Startup opt-in is explicit and reversible (visible in Windows startup settings) |  |  |
 | Upgrade preserves scenes/settings |  |  |
-| Uninstall removes startup entry it created |  |  |
-| Uninstall retains `%LOCALAPPDATA%\\AudioDock` by default |  |  |
+| Uninstall (or ZIP-removal procedure) handles the startup entry per ownership rule |  |  |
+| Uninstall retains %LOCALAPPDATA%\AudioDock by default |  |  |
 | Optional data deletion requires explicit user choice |  |  |
 | Accessibility smoke (keyboard/focus/high contrast/200% scaling/non-color cues) |  |  |
 
@@ -122,9 +131,12 @@ Remove-Item Env:AUDIO_DOCK_STARTUP_TEST
 
 ## Compatibility and honesty notes
 
-- What this run proves:
-- What this run does **not** prove (device/driver/application classes not covered):
-- Any partial failures or skipped checks:
+Use these exact bullet labels (the gate validator matches on them); keep any
+extra qualifier text after the colon:
+
+- What this run proves (device/driver/application classes actually exercised):
+- What this run does not prove (device/driver/application classes not covered):
+- Blockers remaining (include any partial failures or skipped checks):
 
 ## Release gate decision
 
