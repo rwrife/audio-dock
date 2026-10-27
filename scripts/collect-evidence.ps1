@@ -81,6 +81,11 @@ function Test-ArchiveChecksum {
         return [pscustomobject]$result
     }
     $result.ExpectedHash = $Matches[1]
+    if ($Matches[2] -cne (Split-Path -Leaf $ArchivePath)) {
+        $result.State = 'malformed'
+        $result.Detail = 'Checksum entry does not name the archive being verified.'
+        return [pscustomobject]$result
+    }
     $result.ActualHash = (Get-FileHash -LiteralPath $ArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($result.ActualHash -eq $result.ExpectedHash) {
         $result.State = 'match'

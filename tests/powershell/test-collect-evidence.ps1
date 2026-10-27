@@ -66,6 +66,12 @@ try {
 
     $absent = Test-ArchiveChecksum -ArchivePath (Join-Path $temporaryRoot 'nope.zip') -ChecksumPath (Join-Path $temporaryRoot 'nope.zip.sha256')
     Assert-True ($absent.State -eq 'missing') 'Missing artifact reports missing, not success'
+    "$goodHash  unrelated.zip" | Set-Content -LiteralPath $checksumPath -Encoding ascii
+    $wrongName = Test-ArchiveChecksum -ArchivePath $artifact -ChecksumPath $checksumPath
+    Assert-True ($wrongName.State -eq 'malformed') 'Checksum naming a different archive is rejected even when hash matches'
+    "$goodHash  ../payload.zip" | Set-Content -LiteralPath $checksumPath -Encoding ascii
+    $traversal = Test-ArchiveChecksum -ArchivePath $artifact -ChecksumPath $checksumPath
+    Assert-True ($traversal.State -eq 'malformed') 'Checksum filename cannot include a relative path'
 
     'garbage' | Set-Content -LiteralPath $checksumPath -Encoding ascii
     $malformed = Test-ArchiveChecksum -ArchivePath $artifact -ChecksumPath $checksumPath
