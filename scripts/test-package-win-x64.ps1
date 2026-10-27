@@ -45,9 +45,12 @@ Get-Content -LiteralPath (Join-Path $packagePath "SHA256SUMS.txt") | ForEach-Obj
     }
 }
 
-$archiveChecksum = Get-Content -LiteralPath $archiveChecksumPath -Raw
-if ($archiveChecksum -notmatch "^([0-9a-f]{64})  .+\.zip\s*$") {
+$archiveChecksum = (Get-Content -LiteralPath $archiveChecksumPath -Raw).Trim()
+if ($archiveChecksum -notmatch "^([0-9a-f]{64})  (.+)$") {
     throw "Archive checksum is malformed."
+}
+if ($matches[2] -cne (Split-Path -Leaf $archivePath)) {
+    throw "Archive checksum names a different ZIP."
 }
 
 $actualArchiveHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
