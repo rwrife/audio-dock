@@ -56,9 +56,9 @@ try {
     Set-Content -LiteralPath $artifact -Value 'fake archive bytes' -Encoding ascii
     $goodHash = (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash.ToLowerInvariant()
     $checksumPath = "$artifact.sha256"
-    "$goodHash  payload.zip" | Set-Content -LiteralPath $checksumPath -Encoding ascii
+    "$goodHash  payload.zip`r`n" | Set-Content -LiteralPath $checksumPath -Encoding ascii -NoNewline
     $match = Test-ArchiveChecksum -ArchivePath $artifact -ChecksumPath $checksumPath
-    Assert-True ($match.State -eq 'match') 'Valid checksum verifies as match'
+    Assert-True ($match.State -eq 'match') 'Valid checksum verifies as match with CRLF line ending'
 
     "0000000000000000000000000000000000000000000000000000000000000000  payload.zip" | Set-Content -LiteralPath $checksumPath -Encoding ascii
     $mismatch = Test-ArchiveChecksum -ArchivePath $artifact -ChecksumPath $checksumPath
