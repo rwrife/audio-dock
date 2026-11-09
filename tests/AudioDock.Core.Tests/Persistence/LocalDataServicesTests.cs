@@ -172,7 +172,8 @@ public sealed class LocalDataServicesTests : IDisposable
         Assert.DoesNotContain("Private scene", raw);
         Assert.DoesNotContain("secret-target", raw);
         Assert.DoesNotContain(exportPath, raw);
-        Assert.DoesNotContain("0.5", raw);
+        // Timestamps can contain "0.5"; inspect diagnostic content, not serialized time.
+        Assert.All(await diagnostics.InspectAsync(), item => Assert.DoesNotContain("0.5", item.Detail));
     }
 
     [Fact]
